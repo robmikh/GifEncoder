@@ -20,6 +20,9 @@
 #include <winrt/Windows.Graphics.Capture.h>
 #include <winrt/Windows.Graphics.DirectX.h>
 #include <winrt/Windows.Graphics.DirectX.Direct3d11.h>
+#include <winrt/Windows.Data.Xml.Dom.h>
+#include <winrt/Windows.Data.Xml.Xsl.h>
+#include <winrt/Windows.Security.Cryptography.h>
 
 // WIL
 #include <wil/resource.h>
@@ -38,6 +41,7 @@
 #include <algorithm>
 #include <mutex>
 #include <filesystem>
+#include <cwctype>
 
 // robmikh.common
 #include <robmikh.common/composition.interop.h>
