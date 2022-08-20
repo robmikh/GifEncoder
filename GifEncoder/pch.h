@@ -10,6 +10,8 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.Numerics.h>
+#include <winrt/Windows.Storage.h>
+#include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.System.h>
 #include <winrt/Windows.UI.h>
 #include <winrt/Windows.UI.Composition.h>
@@ -35,6 +37,7 @@
 #include <memory>
 #include <algorithm>
 #include <mutex>
+#include <filesystem>
 
 // robmikh.common
 #include <robmikh.common/composition.interop.h>
@@ -44,3 +47,6 @@
 #include <robmikh.common/d3dHelpers.desktop.h>
 #include <robmikh.common/composition.desktop.interop.h>
 #include <robmikh.common/capture.desktop.interop.h>
+#include <robmikh.common/storage.desktop.h>
+#include <robmikh.common/imaging.h>
+#include <robmikh.common/stream.interop.h>
