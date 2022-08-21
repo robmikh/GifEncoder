@@ -21,15 +21,29 @@ namespace util
     using namespace robmikh::common::desktop;
 }
 
+struct Options
+{
+    bool UseDebugLayer;
+    std::wstring InputPath;
+    std::wstring OutputPath;
+};
+
+enum class CliResult
+{
+    Valid,
+    Invalid,
+    Help,
+};
+
+CliResult ParseOptions(std::vector<std::wstring> const& args, Options& options);
+void PrintHelp();
 std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
     winrt::StorageFile file);
 
-winrt::IAsyncAction MainAsync(bool useDebugLayer)
+winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::wstring outputPath)
 {
     // Create output file
-    auto path = std::filesystem::current_path();
-    path /= "test.gif";
-    auto outputFile = co_await util::CreateStorageFileFromPathAsync(path.wstring());
+    auto outputFile = co_await util::CreateStorageFileFromPathAsync(outputPath);
 
     // Open the file for write
     auto stream = co_await outputFile.OpenAsync(winrt::FileAccessMode::ReadWrite);
@@ -93,9 +107,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer)
     }
 
     // Read rani file
-    path = std::filesystem::current_path();
-    path /= "untitled.rani";
-    auto inputFile = co_await util::GetStorageFileFromPathAsync(path.wstring());
+    auto inputFile = co_await util::GetStorageFileFromPathAsync(inputPath);
     auto project = co_await LoadRaniProjectFromStorageFileAsync(inputFile);
 
     // Create a texture for each composed layer
@@ -247,14 +259,26 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer)
     winrt::check_hresult(wicEncoder->Commit());
 }
 
-int __stdcall wmain()
+int __stdcall wmain(int argc, wchar_t* argv[])
 {
     // Initialize COM
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
 
-    bool useDebugLayer = true;
+    // CLI
+    std::vector<std::wstring> args(argv + 1, argv + argc);
+    Options options = {};
+    auto cliResult = ParseOptions(args, options);
+    switch (cliResult)
+    {
+    case CliResult::Help:
+        return 0;
+    case CliResult::Invalid:
+        return 1;
+    default:
+        break;
+    }
 
-    MainAsync(useDebugLayer).get();
+    MainAsync(options.UseDebugLayer, options.InputPath, options.OutputPath).get();
 
     return 0;
 }
@@ -264,4 +288,47 @@ std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
 {
     auto document = co_await winrt::XmlDocument::LoadFromFileAsync(file);
     co_return LoadRaniProjectFromXmlDocument(document);
+}
+
+CliResult ParseOptions(std::vector<std::wstring> const& args, Options& options)
+{
+    using namespace robmikh::common::wcli::impl;
+
+    if (GetFlag(args, L"-help") || GetFlag(args, L"/?"))
+    {
+        PrintHelp();
+        return CliResult::Help;
+    }
+    auto inputPath = GetFlagValue(args, L"-i", L"/i");
+    if (inputPath.empty())
+    {
+        wprintf(L"Invalid input path! Use '-help' for help.\n");
+        return CliResult::Invalid;
+    }
+    auto outputPath = GetFlagValue(args, L"-o", L"/o");
+    if (outputPath.empty())
+    {
+        wprintf(L"Invalid output path! Use '-help' for help.\n");
+        return CliResult::Invalid;
+    }
+    auto useDebugLayer = GetFlag(args, L"-dxDebug", L"/dxDebug");
+
+    options.UseDebugLayer = useDebugLayer;
+    options.InputPath = inputPath;
+    options.OutputPath = outputPath;
+    return CliResult::Valid;
+}
+
+void PrintHelp()
+{
+    wprintf(L"GifEncoder.exe\n");
+    wprintf(L"An experimental GIF encoder utility for Windows.\n");
+    wprintf(L"\n");
+    wprintf(L"Arguments:\n");
+    wprintf(L"  -f <input path>          (required) Path to input file (*.rani).\n");
+    wprintf(L"  -o <output path>         (required) Path to the output image that will be created.\n");
+    wprintf(L"\n");
+    wprintf(L"Flags:\n");
+    wprintf(L"  -dxDebug           (optional) Use the DirectX and DirectML debug layers.\n");
+    wprintf(L"\n");
 }

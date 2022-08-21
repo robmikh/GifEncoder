@@ -56,4 +56,5 @@
 #include <robmikh.common/storage.desktop.h>
 #include <robmikh.common/imaging.h>
 #include <robmikh.common/stream.interop.h>
+#include <robmikh.common/wcliparse.h>
 #include "d2dHelpers.h"
