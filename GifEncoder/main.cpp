@@ -241,6 +241,10 @@ int __stdcall wmain()
         {
             transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
         }
+        else
+        {
+            transparencyFixer.InitPrevious(frameTexture);
+        }
 
         {
             std::stringstream stringStream;
