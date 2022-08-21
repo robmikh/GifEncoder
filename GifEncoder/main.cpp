@@ -115,6 +115,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
 
     auto transparencyFixer = TransparencyFixer(d3dDevice, d3dContext, width, height);
     std::vector<uint8_t> indexPixelBytes(width * height, 0);
+    std::vector<uint8_t> tempBuffer;
 
     // Encode each frame
     auto frameIndex = 0;
@@ -171,9 +172,14 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
             WICBitmapPaletteTypeFixedWebPalette));
         winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, static_cast<uint32_t>(indexPixelBytes.size()), indexPixelBytes.data()));
 
+        std::optional<DiffInfo> diffInfoOpt = std::nullopt;
         if (transparentColorIndex >= 0 && frameIndex > 0)
         {
-            transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
+            auto info = transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
+            if (info.NumDifferingPixels > 0)
+            {
+                diffInfoOpt = std::optional(std::move(info));
+            }
         }
         else
         {
@@ -188,14 +194,43 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
 
         // Create a new bitmap with the fixed bytes
         winrt::com_ptr<IWICBitmap> wicBitmapFixed;
-        winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
-            desc.Width,
-            desc.Height,
-            GUID_WICPixelFormat8bppIndexed,
-            desc.Width,
-            static_cast<uint32_t>(indexPixelBytes.size()),
-            indexPixelBytes.data(),
-            wicBitmapFixed.put()));
+        if (diffInfoOpt.has_value())
+        {
+            auto diffInfo = diffInfoOpt.value();
+
+            uint32_t minValue = 1;
+            uint32_t newWidth = std::max(diffInfo.right - diffInfo.left, minValue);
+            uint32_t newHeight = std::max(diffInfo.bottom - diffInfo.top, minValue);
+            tempBuffer.resize(newWidth * newHeight);
+
+            for (uint32_t i = 0; i < newHeight; i++)
+            {
+                auto source = indexPixelBytes.data() + (((diffInfo.top + i) * width) + diffInfo.left);
+                auto dest = tempBuffer.data() + (i * newWidth);
+
+                memcpy_s(dest, newWidth, source, newWidth);
+            }
+
+            winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
+                newWidth,
+                newHeight,
+                GUID_WICPixelFormat8bppIndexed,
+                newWidth,
+                static_cast<uint32_t>(tempBuffer.size()),
+                tempBuffer.data(),
+                wicBitmapFixed.put()));
+        }
+        else
+        {
+            winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
+                desc.Width,
+                desc.Height,
+                GUID_WICPixelFormat8bppIndexed,
+                desc.Width,
+                static_cast<uint32_t>(indexPixelBytes.size()),
+                indexPixelBytes.data(),
+                wicBitmapFixed.put()));
+        }
         winrt::check_hresult(wicBitmapFixed->SetPalette(wicPalette.get()));
 
         // Setup our WIC frame
@@ -250,6 +285,24 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
             //    auto debugFileName = ImageViewerFileNameFromSize("debug", desc.Width, desc.Height);
             //    WriteBgra8PixelsToFile(debugFileName, bytes);
             //}
+        }
+
+        if (diffInfoOpt.has_value())
+        {
+            auto diffInfo = diffInfoOpt.value();
+
+            {
+                PROPVARIANT value = {};
+                value.vt = VT_UI2;
+                value.uiVal = static_cast<unsigned short>(diffInfo.left);
+                winrt::check_hresult(metadata->SetMetadataByName(L"/imgdesc/Left", &value));
+            }
+            {
+                PROPVARIANT value = {};
+                value.vt = VT_UI2;
+                value.uiVal = static_cast<unsigned short>(diffInfo.top);
+                winrt::check_hresult(metadata->SetMetadataByName(L"/imgdesc/Top", &value));
+            }
         }
 
         // Write out bitmap and commit the frame
