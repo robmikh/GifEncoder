@@ -229,6 +229,18 @@ int __stdcall wmain()
 
         std::vector<uint8_t> readbackBytes(desc.Width * desc.Height, 0);
         winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, readbackBytes.size(), readbackBytes.data()));
+        
+
+        // Attmept to fix the alpha
+        for (auto i = 0; i < desc.Width * desc.Height; i++)
+        {
+            auto alpha = bytes[(i * 4) + 3];
+            if (alpha == 0)
+            {
+                readbackBytes[i] = transparentColorIndex;
+            }
+        }
+
         {
             std::stringstream stringStream;
             stringStream << "debug_indexed_" << desc.Width << "x" << desc.Height << ".bin";
@@ -243,6 +255,18 @@ int __stdcall wmain()
                 file.write(reinterpret_cast<const char*>(bgraBytes.data()), bgraBytes.size());
             }
         }
+
+        // Create a new bitmap with the fixed bytes
+        winrt::com_ptr<IWICBitmap> wicBitmapFixed;
+        winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
+            desc.Width,
+            desc.Height,
+            GUID_WICPixelFormat8bppIndexed,
+            desc.Width,
+            readbackBytes.size(),
+            readbackBytes.data(),
+            wicBitmapFixed.put()));
+        winrt::check_hresult(wicBitmapFixed->SetPalette(wicPalette.get()));
 
         // Setup our WIC frame
         winrt::com_ptr<IWICBitmapFrameEncode> wicFrame;
@@ -273,7 +297,7 @@ int __stdcall wmain()
                 PROPVARIANT transparencyIndex = {};
                 transparencyIndex.vt = VT_UI1;
                 transparencyIndex.bVal = static_cast<uint8_t>(transparentColorIndex);
-                transparencyIndex.bVal = 0;
+                //transparencyIndex.bVal = 0;
                 winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/TransparentColorIndex", &transparencyIndex));
             }
         }
@@ -296,7 +320,7 @@ int __stdcall wmain()
         }
 
         // Write out bitmap and commit the frame
-        winrt::check_hresult(wicFrame->WriteSource(wicConverter.get(), nullptr));
+        winrt::check_hresult(wicFrame->WriteSource(wicBitmapFixed.get(), nullptr));
         winrt::check_hresult(wicFrame->Commit());
 
         frameIndex++;
