@@ -26,7 +26,7 @@ uint32_t ComputePaddedBufferSize(size_t size)
 		auto remainder = paddedSize % 16;
 		paddedSize = paddedSize + remainder;
 	}
-	return paddedSize;
+	return static_cast<uint32_t>(paddedSize);
 }
 
 template <typename T>

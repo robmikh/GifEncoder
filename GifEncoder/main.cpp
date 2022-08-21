@@ -95,30 +95,32 @@ int __stdcall wmain()
 
     // Write the application block
     // http://www.vurdalakov.net/misc/gif/netscape-looping-application-extension
-    winrt::com_ptr<IWICMetadataQueryWriter> metadata;
-    winrt::check_hresult(wicEncoder->GetMetadataQueryWriter(metadata.put()));
     {
-        PROPVARIANT value = {};
-        value.vt = VT_UI1 | VT_VECTOR;
-        value.caub.cElems = 11;
-        std::string text("NETSCAPE2.0");
-        std::vector<uint8_t> chars(text.begin(), text.end());
-        WINRT_VERIFY(chars.size() == 11);
-        value.caub.pElems = chars.data();
-        winrt::check_hresult(metadata->SetMetadataByName(L"/appext/application", &value));
-    }
-    {
-        PROPVARIANT value = {};
-        value.vt = VT_UI1 | VT_VECTOR;
-        value.caub.cElems = 5;
-        // The first value is the size of the block, which is the fixed value 3.
-        // The second value is the looping extension, which is the fixed value 1.
-        // The third and fourth values comprise an unsigned 2-byte integer (little endian).
-        //     The value of 0 means to loop infinitely.
-        // The final value is the block terminator, which is the fixed value 0.
-        std::vector<uint8_t> data({ 3, 1, 0, 0, 0 });
-        value.caub.pElems = data.data();
-        winrt::check_hresult(metadata->SetMetadataByName(L"/appext/data", &value));
+        winrt::com_ptr<IWICMetadataQueryWriter> metadata;
+        winrt::check_hresult(wicEncoder->GetMetadataQueryWriter(metadata.put()));
+        {
+            PROPVARIANT value = {};
+            value.vt = VT_UI1 | VT_VECTOR;
+            value.caub.cElems = 11;
+            std::string text("NETSCAPE2.0");
+            std::vector<uint8_t> chars(text.begin(), text.end());
+            WINRT_VERIFY(chars.size() == 11);
+            value.caub.pElems = chars.data();
+            winrt::check_hresult(metadata->SetMetadataByName(L"/appext/application", &value));
+        }
+        {
+            PROPVARIANT value = {};
+            value.vt = VT_UI1 | VT_VECTOR;
+            value.caub.cElems = 5;
+            // The first value is the size of the block, which is the fixed value 3.
+            // The second value is the looping extension, which is the fixed value 1.
+            // The third and fourth values comprise an unsigned 2-byte integer (little endian).
+            //     The value of 0 means to loop infinitely.
+            // The final value is the block terminator, which is the fixed value 0.
+            std::vector<uint8_t> data({ 3, 1, 0, 0, 0 });
+            value.caub.pElems = data.data();
+            winrt::check_hresult(metadata->SetMetadataByName(L"/appext/data", &value));
+        }
     }
 
     // Read rani file
@@ -196,7 +198,7 @@ int __stdcall wmain()
             desc.Height,
             GUID_WICPixelFormat32bppBGRA,
             bytesPerPixel * desc.Width,
-            bytes.size(),
+            static_cast<uint32_t>(bytes.size()),
             bytes.data(),
             wicBitmap.put()));
 
@@ -228,7 +230,7 @@ int __stdcall wmain()
             wicPalette.get(),
             0.0,
             WICBitmapPaletteTypeFixedWebPalette));
-        winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, indexPixelBytes.size(), indexPixelBytes.data()));
+        winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, static_cast<uint32_t>(indexPixelBytes.size()), indexPixelBytes.data()));
         
         if (transparentColorIndex >= 0 && frameIndex > 0)
         {
@@ -262,7 +264,7 @@ int __stdcall wmain()
             desc.Height,
             GUID_WICPixelFormat8bppIndexed,
             desc.Width,
-            indexPixelBytes.size(),
+            static_cast<uint32_t>(indexPixelBytes.size()),
             indexPixelBytes.data(),
             wicBitmapFixed.put()));
         winrt::check_hresult(wicBitmapFixed->SetPalette(wicPalette.get()));
@@ -388,10 +390,10 @@ std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
             auto blue = (0x0000FF00 & rawColor) >> 8;
             auto alpha = 0x000000FF & rawColor;
 
-            project->BackgroundColor.A = alpha;
-            project->BackgroundColor.R = red;
-            project->BackgroundColor.G = green;
-            project->BackgroundColor.B = blue;
+            project->BackgroundColor.A = static_cast<uint8_t>(alpha);
+            project->BackgroundColor.R = static_cast<uint8_t>(red);
+            project->BackgroundColor.G = static_cast<uint8_t>(green);
+            project->BackgroundColor.B = static_cast<uint8_t>(blue);
         }
     }
     if (project->Width == 0 || project->Height == 0)
@@ -440,7 +442,7 @@ std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
                                         else if (attributeName == L"Opacity")
                                         {
                                             auto value = std::wstring(winrt::unbox_value<winrt::hstring>(attributeValue));
-                                            layer.Opacity = std::stoi(value);
+                                            layer.Opacity = std::stof(value);
                                         }
                                     }
 
