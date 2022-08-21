@@ -1,4 +1,6 @@
 ﻿#include "pch.h"
+#include "PaletteIndexLUT.h"
+#include "ColorQuantizer.h"
 
 namespace winrt
 {
@@ -54,6 +56,8 @@ int __stdcall wmain()
     // Initialize COM
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
 
+    bool useDebugLayer = true;
+
     // Create output file
     auto path = std::filesystem::current_path();
     path /= "test.gif";
@@ -64,10 +68,20 @@ int __stdcall wmain()
     auto abiStream = util::CreateStreamFromRandomAccessStream(stream);
 
     // Initialize DirectX
-    auto d3dDevice = util::CreateD3DDevice();
+    uint32_t d3dCreateFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+    if (useDebugLayer)
+    {
+        d3dCreateFlags |= D3D11_CREATE_DEVICE_DEBUG;
+    }
+    auto d3dDevice = util::CreateD3DDevice(d3dCreateFlags);
     winrt::com_ptr<ID3D11DeviceContext> d3dContext;
     d3dDevice->GetImmediateContext(d3dContext.put());
-    auto d2dFactory = util::CreateD2DFactory();
+    auto debugLevel = D2D1_DEBUG_LEVEL_NONE;
+    if (useDebugLayer)
+    {
+        debugLevel = D2D1_DEBUG_LEVEL_INFORMATION;
+    }
+    auto d2dFactory = util::CreateD2DFactory(debugLevel);
     auto d2dDevice = util::CreateD2DDevice(d2dFactory, d3dDevice);
     winrt::com_ptr<ID2D1DeviceContext> d2dContext;
     winrt::check_hresult(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, d2dContext.put()));
@@ -168,19 +182,23 @@ int __stdcall wmain()
     // Use 10ms units
     auto frameDelay = millisconds.count() / 10;
 
+    auto paletteLUTGenerator = PaletteIndexLUT(d3dDevice, d3dContext);
+    auto quantizer = ColorQuantizer(d3dDevice, d3dContext, project->Width, project->Height);
+    std::vector<uint8_t> indexPixelBytes(project->Width * project->Height, 0);
+
     // Encode each frame
     auto frameIndex = 0;
     for (auto&& frameTexture : frames)
     {
         // Create our converter
-        winrt::com_ptr<IWICFormatConverter> wicConverter;
-        winrt::check_hresult(wicFactory->CreateFormatConverter(wicConverter.put()));
+        //winrt::com_ptr<IWICFormatConverter> wicConverter;
+        //winrt::check_hresult(wicFactory->CreateFormatConverter(wicConverter.put()));
 
         // Create a WIC bitmap from our texture
         D3D11_TEXTURE2D_DESC desc = {};
         frameTexture->GetDesc(&desc);
         auto bytes = util::CopyBytesFromTexture(frameTexture);
-        auto bytesPerPixel = util::GetBytesPerPixel(desc.Format);
+        auto bytesPerPixel = 4;
         winrt::com_ptr<IWICBitmap> wicBitmap;
         winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
             desc.Width,
@@ -211,6 +229,27 @@ int __stdcall wmain()
             }
         }
 
+        // Build the lookup table for our palette
+        std::vector<uint8_t> bgraPaletteBytes(colors.size() * 4, 0);
+        for (auto i = 0; i < colors.size(); i++)
+        {
+            auto&& wicColor = colors[i];
+
+            auto alpha = (0xFF000000 & wicColor) >> 24;
+            auto red = (0x00FF0000 & wicColor) >> 16;
+            auto green = (0x0000FF00 & wicColor) >> 8;
+            auto blue = 0x000000FF & wicColor;
+
+            bgraPaletteBytes[(i * 4) + 3] = static_cast<uint8_t>(alpha);
+            bgraPaletteBytes[(i * 4) + 2] = static_cast<uint8_t>(red);
+            bgraPaletteBytes[(i * 4) + 1] = static_cast<uint8_t>(green);
+            bgraPaletteBytes[(i * 4) + 0] = static_cast<uint8_t>(blue);
+        }
+        paletteLUTGenerator.Generate(bgraPaletteBytes, transparentColorIndex);
+
+        // Quanitze the pixels
+        quantizer.Quantize(frameTexture, paletteLUTGenerator.Srv(), transparentColorIndex, indexPixelBytes);
+
         // TEMP DEBUG
         //for (auto&& color : colors)
         //{
@@ -219,33 +258,33 @@ int __stdcall wmain()
         //wprintf(L"\n");
 
         // Convert our frame using the palette
-        winrt::check_hresult(wicConverter->Initialize(
-            wicBitmap.get(),
-            GUID_WICPixelFormat8bppIndexed,
-            WICBitmapDitherTypeNone, // ???
-            wicPalette.get(),
-            0.0,
-            WICBitmapPaletteTypeFixedWebPalette));
-
-        std::vector<uint8_t> readbackBytes(desc.Width * desc.Height, 0);
-        winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, readbackBytes.size(), readbackBytes.data()));
+        //winrt::check_hresult(wicConverter->Initialize(
+        //    wicBitmap.get(),
+        //    GUID_WICPixelFormat8bppIndexed,
+        //    WICBitmapDitherTypeNone, // ???
+        //    wicPalette.get(),
+        //    0.0,
+        //    WICBitmapPaletteTypeFixedWebPalette));
+        //
+        //std::vector<uint8_t> readbackBytes(desc.Width * desc.Height, 0);
+        //winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, readbackBytes.size(), readbackBytes.data()));
         
 
         // Attmept to fix the alpha
-        for (auto i = 0; i < desc.Width * desc.Height; i++)
-        {
-            auto alpha = bytes[(i * 4) + 3];
-            if (alpha == 0)
-            {
-                readbackBytes[i] = transparentColorIndex;
-            }
-        }
+        //for (auto i = 0; i < desc.Width * desc.Height; i++)
+        //{
+        //    auto alpha = bytes[(i * 4) + 3];
+        //    if (alpha == 0)
+        //    {
+        //        readbackBytes[i] = transparentColorIndex;
+        //    }
+        //}
 
         {
             std::stringstream stringStream;
             stringStream << "debug_indexed_" << desc.Width << "x" << desc.Height << ".bin";
             std::ofstream file(stringStream.str(), std::ios::out | std::ios::binary);
-            for (auto&& index : readbackBytes)
+            for (auto&& index : indexPixelBytes)
             {
                 std::vector<uint8_t> bgraBytes(4, 0);
                 bgraBytes[0] = index;
@@ -263,8 +302,8 @@ int __stdcall wmain()
             desc.Height,
             GUID_WICPixelFormat8bppIndexed,
             desc.Width,
-            readbackBytes.size(),
-            readbackBytes.data(),
+            indexPixelBytes.size(),
+            indexPixelBytes.data(),
             wicBitmapFixed.put()));
         winrt::check_hresult(wicBitmapFixed->SetPalette(wicPalette.get()));
 

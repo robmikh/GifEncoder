@@ -7,8 +7,20 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp" />
+    <ClCompile Include="PaletteIndexLUT.cpp" />
+    <ClCompile Include="ColorQuantizer.cpp" />
+    <ClCompile Include="TransparencyFixer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="PaletteIndexLUT.h" />
+    <ClInclude Include="ColorQuantizer.h" />
+    <ClInclude Include="TransparencyFixer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="LUTGeneration.hlsl" />
+    <FxCompile Include="LUTLookup_VS.hlsl" />
+    <FxCompile Include="LUTLookup_PS.hlsl" />
+    <FxCompile Include="FixTransparency.hlsl" />
   </ItemGroup>
 </Project>
