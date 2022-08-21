@@ -24,20 +24,15 @@ namespace util
 std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
     winrt::StorageFile file);
 
-int __stdcall wmain()
+winrt::IAsyncAction MainAsync(bool useDebugLayer)
 {
-    // Initialize COM
-    winrt::init_apartment(winrt::apartment_type::multi_threaded);
-
-    bool useDebugLayer = true;
-
     // Create output file
     auto path = std::filesystem::current_path();
     path /= "test.gif";
-    auto outputFile = util::CreateStorageFileFromPathAsync(path.wstring()).get();
+    auto outputFile = co_await util::CreateStorageFileFromPathAsync(path.wstring());
 
     // Open the file for write
-    auto stream = outputFile.OpenAsync(winrt::FileAccessMode::ReadWrite).get();
+    auto stream = co_await outputFile.OpenAsync(winrt::FileAccessMode::ReadWrite);
     auto abiStream = util::CreateStreamFromRandomAccessStream(stream);
 
     // Initialize DirectX
@@ -100,8 +95,8 @@ int __stdcall wmain()
     // Read rani file
     path = std::filesystem::current_path();
     path /= "untitled.rani";
-    auto inputFile = util::GetStorageFileFromPathAsync(path.wstring()).get();
-    auto project = LoadRaniProjectFromStorageFileAsync(inputFile).get();
+    auto inputFile = co_await util::GetStorageFileFromPathAsync(path.wstring());
+    auto project = co_await LoadRaniProjectFromStorageFileAsync(inputFile);
 
     // Create a texture for each composed layer
     auto frames = ComposeFrames(project, d3dDevice, d2dContext);
@@ -166,7 +161,7 @@ int __stdcall wmain()
             0.0,
             WICBitmapPaletteTypeFixedWebPalette));
         winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, static_cast<uint32_t>(indexPixelBytes.size()), indexPixelBytes.data()));
-        
+
         if (transparentColorIndex >= 0 && frameIndex > 0)
         {
             transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
@@ -210,7 +205,7 @@ int __stdcall wmain()
             winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/Delay", &delayValue));
         }
         // Transparency
-        if (transparentColorIndex >= 0 && frameIndex > 0) 
+        if (transparentColorIndex >= 0 && frameIndex > 0)
         {
             {
                 PROPVARIANT transparencyValue = {};
@@ -250,6 +245,16 @@ int __stdcall wmain()
         frameIndex++;
     }
     winrt::check_hresult(wicEncoder->Commit());
+}
+
+int __stdcall wmain()
+{
+    // Initialize COM
+    winrt::init_apartment(winrt::apartment_type::multi_threaded);
+
+    bool useDebugLayer = true;
+
+    MainAsync(useDebugLayer).get();
 
     return 0;
 }
