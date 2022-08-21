@@ -58,3 +58,4 @@
 #include <robmikh.common/stream.interop.h>
 #include <robmikh.common/wcliparse.h>
 #include "d2dHelpers.h"
+#include "wicHelpers.h"

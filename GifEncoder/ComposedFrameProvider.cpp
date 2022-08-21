@@ -1,6 +1,7 @@
 #include "pch.h"
 #include "IComposedFrameProvider.h"
 #include "RaniComposedFrameProvider.h"
+#include "GifComposedFrameProvider.h"
 
 namespace winrt
 {
@@ -27,6 +28,17 @@ std::future<std::unique_ptr<IComposedFrameProvider>> LoadComposedFrameProviderFr
         auto document = co_await winrt::XmlDocument::LoadFromFileAsync(file);
         auto project = LoadRaniProjectFromXmlDocument(document);
         result = std::make_unique<RaniComposedFrameProvider>(std::move(project));
+    }
+    else if (extension == L".gif")
+    {
+        auto inMemoryStream = winrt::InMemoryRandomAccessStream();
+        {
+            auto stream = co_await file.OpenAsync(winrt::FileAccessMode::Read);
+            winrt::RandomAccessStream::CopyAsync(stream, inMemoryStream);
+        }
+
+        auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);
+        result = std::make_unique<GifComposedFrameProvider>(inMemoryStream, wicFactory);
     }
     else
     {

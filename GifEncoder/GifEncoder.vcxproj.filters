@@ -9,6 +9,7 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="TransparencyFixer.cpp" />
     <ClCompile Include="ComposedFrameProvider.cpp" />
+    <ClCompile Include="GifComposedFrameProvider.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -18,6 +19,8 @@
     <ClInclude Include="DebugFileWriters.h" />
     <ClInclude Include="IComposedFrameProvider.h" />
     <ClInclude Include="RaniComposedFrameProvider.h" />
+    <ClInclude Include="GifComposedFrameProvider.h" />
+    <ClInclude Include="wicHelpers.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="FixTransparency.hlsl" />

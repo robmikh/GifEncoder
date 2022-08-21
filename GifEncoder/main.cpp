@@ -320,7 +320,7 @@ void PrintHelp()
     wprintf(L"An experimental GIF encoder utility for Windows.\n");
     wprintf(L"\n");
     wprintf(L"Arguments:\n");
-    wprintf(L"  -i <input path>          (required) Path to input file (*.rani).\n");
+    wprintf(L"  -i <input path>          (required) Path to input file (*.rani, *gif).\n");
     wprintf(L"  -o <output path>         (required) Path to the output image that will be created.\n");
     wprintf(L"\n");
     wprintf(L"Flags:\n");
