@@ -42,6 +42,10 @@ std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
 
 winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::wstring outputPath)
 {
+    // Read rani file
+    auto inputFile = co_await util::GetStorageFileFromPathAsync(inputPath);
+    auto project = co_await LoadRaniProjectFromStorageFileAsync(inputFile);
+
     // Create output file
     auto outputFile = co_await util::CreateStorageFileFromPathAsync(outputPath);
 
@@ -67,6 +71,9 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     auto d2dDevice = util::CreateD2DDevice(d2dFactory, d3dDevice);
     winrt::com_ptr<ID2D1DeviceContext> d2dContext;
     winrt::check_hresult(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, d2dContext.put()));
+
+    // Create a texture for each composed layer
+    auto frames = ComposeFrames(project, d3dDevice, d2dContext);
 
     // Create WIC Encoder
     auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);
@@ -105,13 +112,6 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
             winrt::check_hresult(metadata->SetMetadataByName(L"/appext/data", &value));
         }
     }
-
-    // Read rani file
-    auto inputFile = co_await util::GetStorageFileFromPathAsync(inputPath);
-    auto project = co_await LoadRaniProjectFromStorageFileAsync(inputFile);
-
-    // Create a texture for each composed layer
-    auto frames = ComposeFrames(project, d3dDevice, d2dContext);
 
     // Compute the frame delay
     auto millisconds = std::chrono::duration_cast<std::chrono::milliseconds>(project->FrameTime);
