@@ -1,6 +1,6 @@
 ﻿#include "pch.h"
 #include "TransparencyFixer.h"
-#include "RaniFormat.h"
+#include "IComposedFrameProvider.h"
 #include "DebugFileWriters.h"
 
 namespace winrt
@@ -37,14 +37,14 @@ enum class CliResult
 
 CliResult ParseOptions(std::vector<std::wstring> const& args, Options& options);
 void PrintHelp();
-std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
-    winrt::StorageFile file);
 
 winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::wstring outputPath)
 {
-    // Read rani file
+    // Read input file
     auto inputFile = co_await util::GetStorageFileFromPathAsync(inputPath);
-    auto project = co_await LoadRaniProjectFromStorageFileAsync(inputFile);
+    auto inputFrameProvider = co_await LoadComposedFrameProviderFromFileAsync(inputFile);
+    uint32_t width = inputFrameProvider->Width();
+    uint32_t height = inputFrameProvider->Height();
 
     // Create output file
     auto outputFile = co_await util::CreateStorageFileFromPathAsync(outputPath);
@@ -73,7 +73,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     winrt::check_hresult(d2dDevice->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, d2dContext.put()));
 
     // Create a texture for each composed layer
-    auto frames = ComposeFrames(project, d3dDevice, d2dContext);
+    auto frames = inputFrameProvider->GetFrames(d3dDevice, d2dContext);
 
     // Create WIC Encoder
     auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);
@@ -113,21 +113,18 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         }
     }
 
-    // Compute the frame delay
-    auto millisconds = std::chrono::duration_cast<std::chrono::milliseconds>(project->FrameTime);
-    // Use 10ms units
-    auto frameDelay = millisconds.count() / 10;
-
-    auto transparencyFixer = TransparencyFixer(d3dDevice, d3dContext, project->Width, project->Height);
-    std::vector<uint8_t> indexPixelBytes(project->Width * project->Height, 0);
+    auto transparencyFixer = TransparencyFixer(d3dDevice, d3dContext, width, height);
+    std::vector<uint8_t> indexPixelBytes(width * height, 0);
 
     // Encode each frame
     auto frameIndex = 0;
-    for (auto&& frameTexture : frames)
+    for (auto&& frame : frames)
     {
         // Create our converter
         winrt::com_ptr<IWICFormatConverter> wicConverter;
         winrt::check_hresult(wicFactory->CreateFormatConverter(wicConverter.put()));
+
+        auto frameTexture = frame.Texture;
 
         // Create a WIC bitmap from our texture
         D3D11_TEXTURE2D_DESC desc = {};
@@ -206,6 +203,11 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         winrt::check_hresult(wicEncoder->CreateNewFrame(wicFrame.put(), nullptr));
         winrt::check_hresult(wicFrame->Initialize(nullptr));
 
+        // Compute the frame delay
+        auto millisconds = std::chrono::duration_cast<std::chrono::milliseconds>(frame.Delay);
+        // Use 10ms units
+        auto frameDelay = millisconds.count() / 10;
+
         // Write frame metadata
         winrt::com_ptr<IWICMetadataQueryWriter> metadata;
         winrt::check_hresult(wicFrame->GetMetadataQueryWriter(metadata.put()));
@@ -283,13 +285,6 @@ int __stdcall wmain(int argc, wchar_t* argv[])
     return 0;
 }
 
-std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
-    winrt::StorageFile file)
-{
-    auto document = co_await winrt::XmlDocument::LoadFromFileAsync(file);
-    co_return LoadRaniProjectFromXmlDocument(document);
-}
-
 CliResult ParseOptions(std::vector<std::wstring> const& args, Options& options)
 {
     using namespace robmikh::common::wcli::impl;
@@ -325,7 +320,7 @@ void PrintHelp()
     wprintf(L"An experimental GIF encoder utility for Windows.\n");
     wprintf(L"\n");
     wprintf(L"Arguments:\n");
-    wprintf(L"  -f <input path>          (required) Path to input file (*.rani).\n");
+    wprintf(L"  -i <input path>          (required) Path to input file (*.rani).\n");
     wprintf(L"  -o <output path>         (required) Path to the output image that will be created.\n");
     wprintf(L"\n");
     wprintf(L"Flags:\n");

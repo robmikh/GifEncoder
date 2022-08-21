@@ -8,6 +8,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="TransparencyFixer.cpp" />
+    <ClCompile Include="ComposedFrameProvider.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -15,6 +16,8 @@
     <ClInclude Include="RaniFormat.h" />
     <ClInclude Include="d2dHelpers.h" />
     <ClInclude Include="DebugFileWriters.h" />
+    <ClInclude Include="IComposedFrameProvider.h" />
+    <ClInclude Include="RaniComposedFrameProvider.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="FixTransparency.hlsl" />

@@ -129,6 +129,7 @@
     <None Include="PropertySheet.props" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ComposedFrameProvider.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="TransparencyFixer.cpp" />
@@ -136,7 +137,9 @@
   <ItemGroup>
     <ClInclude Include="d2dHelpers.h" />
     <ClInclude Include="DebugFileWriters.h" />
+    <ClInclude Include="IComposedFrameProvider.h" />
     <ClInclude Include="pch.h" />
+    <ClInclude Include="RaniComposedFrameProvider.h" />
     <ClInclude Include="RaniFormat.h" />
     <ClInclude Include="TransparencyFixer.h" />
   </ItemGroup>
