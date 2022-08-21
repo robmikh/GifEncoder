@@ -12,6 +12,7 @@
   <ItemGroup>
     <ClInclude Include="pch.h" />
     <ClInclude Include="TransparencyFixer.h" />
+    <ClInclude Include="RaniFormat.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="FixTransparency.hlsl" />

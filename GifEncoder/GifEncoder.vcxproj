@@ -135,6 +135,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="RaniFormat.h" />
     <ClInclude Include="TransparencyFixer.h" />
   </ItemGroup>
   <ItemGroup>
