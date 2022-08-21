@@ -147,13 +147,6 @@ int __stdcall wmain()
 
         auto backgroundColor = project->BackgroundColor;
         auto clearColor = D2D1_COLOR_F{ static_cast<float>(backgroundColor.R) / 255.0f, static_cast<float>(backgroundColor.G) / 255.0f, static_cast<float>(backgroundColor.B) / 255.0f, static_cast<float>(backgroundColor.A) / 255.0f };
-        
-        // TEMP DEBUG
-        project->BackgroundColor.A = 0;
-        project->BackgroundColor.R = 255;
-        project->BackgroundColor.G = 255;
-        project->BackgroundColor.B = 255;
-
         d2dContext->BeginDraw();
         d2dContext->Clear(&clearColor);
         for (auto&& layer : frame.Layers)
@@ -246,6 +239,7 @@ int __stdcall wmain()
             transparencyFixer.InitPrevious(frameTexture);
         }
 
+        // TEMP DEBUG
         {
             std::stringstream stringStream;
             stringStream << "debug_indexed_" << desc.Width << "x" << desc.Height << ".bin";
