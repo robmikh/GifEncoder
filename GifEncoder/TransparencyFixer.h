@@ -9,7 +9,7 @@ public:
 		uint32_t width,
 		uint32_t height);
 
-	std::vector<uint8_t> ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& inputTexture, int transparentColorIndex, std::vector<uint8_t>& indexPixels);
+	void ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& inputTexture, int transparentColorIndex, std::vector<uint8_t>& indexPixels);
 
 private:
 	winrt::com_ptr<ID3D11DeviceContext> m_d3dContext;

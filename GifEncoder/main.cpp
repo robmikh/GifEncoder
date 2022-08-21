@@ -273,7 +273,7 @@ int __stdcall wmain()
         
         if (transparentColorIndex >= 0 && frameIndex > 0)
         {
-            indexPixelBytes = transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
+            transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
         }
 
         // Attmept to fix the alpha

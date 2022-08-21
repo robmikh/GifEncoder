@@ -86,7 +86,7 @@ TransparencyFixer::TransparencyFixer(
 
 }
 
-std::vector<uint8_t> TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& texture, int transparentColorIndex, std::vector<uint8_t>& indexPixels)
+void TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& texture, int transparentColorIndex, std::vector<uint8_t>& indexPixels)
 {
 	D3D11_TEXTURE2D_DESC desc = {};
 	texture->GetDesc(&desc);
@@ -97,6 +97,8 @@ std::vector<uint8_t> TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Textur
 		winrt::check_hresult(m_d3dContext->Map(m_frameInfoStagingBuffer.get(), 0, D3D11_MAP_WRITE, 0, &mapped));
 		FrameInfo info = {};
 		info.TransparentColorIndex = transparentColorIndex;
+		info.Width = desc.Width;
+		info.Height = desc.Height;
 		memcpy_s(mapped.pData, sizeof(FrameInfo), reinterpret_cast<void*>(&info), sizeof(FrameInfo));
 		m_d3dContext->Unmap(m_frameInfoStagingBuffer.get(), 0);
 	}
@@ -126,7 +128,7 @@ std::vector<uint8_t> TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Textur
 	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());
 	std::vector<ID3D11UnorderedAccessView*> uavs = { m_outputUav.get() };
 	m_d3dContext->CSSetUnorderedAccessViews(0, static_cast<uint32_t>(uavs.size()), uavs.data(), nullptr);
-	m_d3dContext->Dispatch(256 / 8, 256 / 8, 1);
+	m_d3dContext->Dispatch((desc.Width / 8) + 1, (desc.Height / 8) + 1, 1);
 
 	m_d3dContext->CopyResource(m_stagingTexture.get(), m_outputTexture.get());
 	{
@@ -153,6 +155,4 @@ std::vector<uint8_t> TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Textur
 	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());
 	uavs = { nullptr };
 	m_d3dContext->CSSetUnorderedAccessViews(0, static_cast<uint32_t>(uavs.size()), uavs.data(), nullptr);
-
-	return util::CopyBytesFromTexture(m_outputTexture);
 }
