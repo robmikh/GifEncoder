@@ -134,6 +134,7 @@
     <ClCompile Include="TransparencyFixer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="d2dHelpers.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RaniFormat.h" />
     <ClInclude Include="TransparencyFixer.h" />

@@ -165,3 +165,51 @@ inline std::unique_ptr<RaniProject> LoadRaniProjectFromXmlDocument(
 
     return project;
 }
+
+inline std::vector<winrt::com_ptr<ID3D11Texture2D>> ComposeFrames(
+    std::unique_ptr<RaniProject> const& project,
+    winrt::com_ptr<ID3D11Device> const& d3dDevice,
+    winrt::com_ptr<ID2D1DeviceContext> const& d2dContext)
+{
+    std::vector<winrt::com_ptr<ID3D11Texture2D>> frames;
+    for (auto&& frame : project->Frames)
+    {
+        D3D11_TEXTURE2D_DESC desc = {};
+        desc.Width = project->Width;
+        desc.Height = project->Height;
+        desc.MipLevels = 1;
+        desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.Usage = D3D11_USAGE_DEFAULT;
+        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+        desc.SampleDesc.Count = 1;
+        winrt::com_ptr<ID3D11Texture2D> renderTargetTexture;
+        winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, renderTargetTexture.put()));
+        auto renderTarget = robmikh::common::uwp::CreateBitmapFromTexture(renderTargetTexture, d2dContext);
+        d2dContext->SetTarget(renderTarget.get());
+
+        auto backgroundColor = project->BackgroundColor;
+        auto clearColor = D2D1_COLOR_F{ static_cast<float>(backgroundColor.R) / 255.0f, static_cast<float>(backgroundColor.G) / 255.0f, static_cast<float>(backgroundColor.B) / 255.0f, static_cast<float>(backgroundColor.A) / 255.0f };
+        d2dContext->BeginDraw();
+        d2dContext->Clear(&clearColor);
+        for (auto&& layer : frame.Layers)
+        {
+            if (layer.Visible)
+            {
+                auto pngDataStream = winrt::Windows::Storage::Streams::InMemoryRandomAccessStream();
+                pngDataStream.WriteAsync(layer.PngData).get();
+
+                auto layerTexture = robmikh::common::uwp::LoadTextureFromStreamAsync(pngDataStream, d3dDevice).get();
+                auto layerBitmap = robmikh::common::uwp::CreateBitmapFromTexture(layerTexture, d2dContext);
+
+                auto opacity = layer.Opacity;
+                d2dContext->DrawBitmap(layerBitmap.get(), nullptr, opacity, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, nullptr, nullptr);
+            }
+        }
+        winrt::check_hresult(d2dContext->EndDraw());
+        d2dContext->SetTarget(nullptr);
+
+        frames.push_back(renderTargetTexture);
+    }
+    return frames;
+}

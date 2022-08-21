@@ -22,9 +22,6 @@ namespace util
 
 std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
     winrt::StorageFile file);
-winrt::com_ptr<ID2D1Bitmap1> CreateBitmapFromTexture(
-    winrt::com_ptr<ID3D11Texture2D> const& texture,
-    winrt::com_ptr<ID2D1DeviceContext> const& d2dContext);
 
 int __stdcall wmain()
 {
@@ -106,46 +103,7 @@ int __stdcall wmain()
     auto project = LoadRaniProjectFromStorageFileAsync(inputFile).get();
 
     // Create a texture for each composed layer
-    std::vector<winrt::com_ptr<ID3D11Texture2D>> frames;
-    for (auto&& frame : project->Frames)
-    {
-        D3D11_TEXTURE2D_DESC desc = {};
-        desc.Width = project->Width;
-        desc.Height = project->Height;
-        desc.MipLevels = 1;
-        desc.ArraySize = 1;
-        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        desc.Usage = D3D11_USAGE_DEFAULT;
-        desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-        desc.SampleDesc.Count = 1;
-        winrt::com_ptr<ID3D11Texture2D> renderTargetTexture;
-        winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, renderTargetTexture.put()));
-        auto renderTarget = CreateBitmapFromTexture(renderTargetTexture, d2dContext);
-        d2dContext->SetTarget(renderTarget.get());
-
-        auto backgroundColor = project->BackgroundColor;
-        auto clearColor = D2D1_COLOR_F{ static_cast<float>(backgroundColor.R) / 255.0f, static_cast<float>(backgroundColor.G) / 255.0f, static_cast<float>(backgroundColor.B) / 255.0f, static_cast<float>(backgroundColor.A) / 255.0f };
-        d2dContext->BeginDraw();
-        d2dContext->Clear(&clearColor);
-        for (auto&& layer : frame.Layers)
-        {
-            if (layer.Visible)
-            {
-                auto pngDataStream = winrt::InMemoryRandomAccessStream();
-                pngDataStream.WriteAsync(layer.PngData).get();
-
-                auto layerTexture = util::LoadTextureFromStreamAsync(pngDataStream, d3dDevice).get();
-                auto layerBitmap = CreateBitmapFromTexture(layerTexture, d2dContext);
-
-                auto opacity = layer.Opacity;
-                d2dContext->DrawBitmap(layerBitmap.get(), nullptr, opacity, D2D1_INTERPOLATION_MODE_NEAREST_NEIGHBOR, nullptr, nullptr);
-            }
-        }
-        winrt::check_hresult(d2dContext->EndDraw());
-        d2dContext->SetTarget(nullptr);
-
-        frames.push_back(renderTargetTexture);
-    }
+    auto frames = ComposeFrames(project, d3dDevice, d2dContext);
 
     // Compute the frame delay
     auto millisconds = std::chrono::duration_cast<std::chrono::milliseconds>(project->FrameTime);
@@ -304,16 +262,6 @@ int __stdcall wmain()
     winrt::check_hresult(wicEncoder->Commit());
 
     return 0;
-}
-
-winrt::com_ptr<ID2D1Bitmap1> CreateBitmapFromTexture(
-    winrt::com_ptr<ID3D11Texture2D> const& texture,
-    winrt::com_ptr<ID2D1DeviceContext> const& d2dContext)
-{
-    auto dxgiSurface = texture.as<IDXGISurface>();
-    winrt::com_ptr<ID2D1Bitmap1> bitmap;
-    winrt::check_hresult(d2dContext->CreateBitmapFromDxgiSurface(dxgiSurface.get(), nullptr, bitmap.put()));
-    return bitmap;
 }
 
 std::future<std::unique_ptr<RaniProject>> LoadRaniProjectFromStorageFileAsync(
