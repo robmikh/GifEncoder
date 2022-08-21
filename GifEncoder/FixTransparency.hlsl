@@ -17,9 +17,10 @@ void main( uint3 DTid : SV_DispatchThreadID )
     {
         float4 pixel = inputTexture[position];
 
-        if (pixel.w <= 0.1f)
-        {
-            outputTexture[position] = TransparentColorIndex;
-        }
+        //if (pixel.w <= 0.1f)
+        //{
+        //    outputTexture[position] = TransparentColorIndex;
+        //}
+        outputTexture[position] = 1;
     }
 }

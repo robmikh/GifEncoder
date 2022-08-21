@@ -2,6 +2,11 @@
 #include "TransparencyFixer.h"
 #include "FixTransparencyShader.h"
 
+namespace util
+{
+	using namespace robmikh::common::uwp;
+}
+
 struct FrameInfo
 {
 	uint32_t Width;
@@ -40,7 +45,7 @@ TransparencyFixer::TransparencyFixer(
 		desc.Format = DXGI_FORMAT_R8_UINT;
 		desc.SampleDesc.Count = 1;
 		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+		desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_outputTexture.put()));
 
 		desc.Usage = D3D11_USAGE_STAGING;
@@ -81,7 +86,7 @@ TransparencyFixer::TransparencyFixer(
 
 }
 
-void TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& texture, int transparentColorIndex, std::vector<uint8_t>& indexPixels)
+std::vector<uint8_t> TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& texture, int transparentColorIndex, std::vector<uint8_t>& indexPixels)
 {
 	D3D11_TEXTURE2D_DESC desc = {};
 	texture->GetDesc(&desc);
@@ -121,7 +126,7 @@ void TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& text
 	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());
 	std::vector<ID3D11UnorderedAccessView*> uavs = { m_outputUav.get() };
 	m_d3dContext->CSSetUnorderedAccessViews(0, static_cast<uint32_t>(uavs.size()), uavs.data(), nullptr);
-	m_d3dContext->Dispatch(256 / 8, 256 / 8, 256 / 8);
+	m_d3dContext->Dispatch(256 / 8, 256 / 8, 1);
 
 	m_d3dContext->CopyResource(m_stagingTexture.get(), m_outputTexture.get());
 	{
@@ -140,4 +145,14 @@ void TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& text
 		}
 		m_d3dContext->Unmap(m_stagingTexture.get(), 0);
 	}
+
+	m_d3dContext->CSSetShader(nullptr, nullptr, 0);
+	srvs = { nullptr };
+	m_d3dContext->CSSetShaderResources(0, static_cast<uint32_t>(srvs.size()), srvs.data());
+	constants = { nullptr };
+	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());
+	uavs = { nullptr };
+	m_d3dContext->CSSetUnorderedAccessViews(0, static_cast<uint32_t>(uavs.size()), uavs.data(), nullptr);
+
+	return util::CopyBytesFromTexture(m_outputTexture);
 }

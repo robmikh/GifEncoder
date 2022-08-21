@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "PaletteIndexLUT.h"
 #include "ColorQuantizer.h"
+#include "TransparencyFixer.h"
 
 namespace winrt
 {
@@ -182,8 +183,9 @@ int __stdcall wmain()
     // Use 10ms units
     auto frameDelay = millisconds.count() / 10;
 
-    auto paletteLUTGenerator = PaletteIndexLUT(d3dDevice, d3dContext);
-    auto quantizer = ColorQuantizer(d3dDevice, d3dContext, project->Width, project->Height);
+    //auto paletteLUTGenerator = PaletteIndexLUT(d3dDevice, d3dContext);
+    //auto quantizer = ColorQuantizer(d3dDevice, d3dContext, project->Width, project->Height);
+    auto transparencyFixer = TransparencyFixer(d3dDevice, d3dContext, project->Width, project->Height);
     std::vector<uint8_t> indexPixelBytes(project->Width * project->Height, 0);
 
     // Encode each frame
@@ -191,8 +193,8 @@ int __stdcall wmain()
     for (auto&& frameTexture : frames)
     {
         // Create our converter
-        //winrt::com_ptr<IWICFormatConverter> wicConverter;
-        //winrt::check_hresult(wicFactory->CreateFormatConverter(wicConverter.put()));
+        winrt::com_ptr<IWICFormatConverter> wicConverter;
+        winrt::check_hresult(wicFactory->CreateFormatConverter(wicConverter.put()));
 
         // Create a WIC bitmap from our texture
         D3D11_TEXTURE2D_DESC desc = {};
@@ -230,25 +232,27 @@ int __stdcall wmain()
         }
 
         // Build the lookup table for our palette
-        std::vector<uint8_t> bgraPaletteBytes(colors.size() * 4, 0);
-        for (auto i = 0; i < colors.size(); i++)
-        {
-            auto&& wicColor = colors[i];
-
-            auto alpha = (0xFF000000 & wicColor) >> 24;
-            auto red = (0x00FF0000 & wicColor) >> 16;
-            auto green = (0x0000FF00 & wicColor) >> 8;
-            auto blue = 0x000000FF & wicColor;
-
-            bgraPaletteBytes[(i * 4) + 3] = static_cast<uint8_t>(alpha);
-            bgraPaletteBytes[(i * 4) + 2] = static_cast<uint8_t>(red);
-            bgraPaletteBytes[(i * 4) + 1] = static_cast<uint8_t>(green);
-            bgraPaletteBytes[(i * 4) + 0] = static_cast<uint8_t>(blue);
-        }
-        paletteLUTGenerator.Generate(bgraPaletteBytes, transparentColorIndex);
+        //std::vector<uint8_t> bgraPaletteBytes(colors.size() * 4, 0);
+        //for (auto i = 0; i < colors.size(); i++)
+        //{
+        //    auto&& wicColor = colors[i];
+        //
+        //    auto alpha = (0xFF000000 & wicColor) >> 24;
+        //    auto red = (0x00FF0000 & wicColor) >> 16;
+        //    auto green = (0x0000FF00 & wicColor) >> 8;
+        //    auto blue = 0x000000FF & wicColor;
+        //
+        //    bgraPaletteBytes[(i * 4) + 3] = static_cast<uint8_t>(alpha);
+        //    bgraPaletteBytes[(i * 4) + 2] = static_cast<uint8_t>(red);
+        //    bgraPaletteBytes[(i * 4) + 1] = static_cast<uint8_t>(green);
+        //    bgraPaletteBytes[(i * 4) + 0] = static_cast<uint8_t>(blue);
+        //}
+        //paletteLUTGenerator.Generate(bgraPaletteBytes, transparentColorIndex);
 
         // Quanitze the pixels
-        quantizer.Quantize(frameTexture, paletteLUTGenerator.Srv(), transparentColorIndex, indexPixelBytes);
+        //quantizer.Quantize(frameTexture, paletteLUTGenerator.Srv(), transparentColorIndex, indexPixelBytes);
+
+
 
         // TEMP DEBUG
         //for (auto&& color : colors)
@@ -258,17 +262,19 @@ int __stdcall wmain()
         //wprintf(L"\n");
 
         // Convert our frame using the palette
-        //winrt::check_hresult(wicConverter->Initialize(
-        //    wicBitmap.get(),
-        //    GUID_WICPixelFormat8bppIndexed,
-        //    WICBitmapDitherTypeNone, // ???
-        //    wicPalette.get(),
-        //    0.0,
-        //    WICBitmapPaletteTypeFixedWebPalette));
-        //
-        //std::vector<uint8_t> readbackBytes(desc.Width * desc.Height, 0);
-        //winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, readbackBytes.size(), readbackBytes.data()));
+        winrt::check_hresult(wicConverter->Initialize(
+            wicBitmap.get(),
+            GUID_WICPixelFormat8bppIndexed,
+            WICBitmapDitherTypeNone, // ???
+            wicPalette.get(),
+            0.0,
+            WICBitmapPaletteTypeFixedWebPalette));
+        winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, indexPixelBytes.size(), indexPixelBytes.data()));
         
+        if (transparentColorIndex >= 0 && frameIndex > 0)
+        {
+            indexPixelBytes = transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
+        }
 
         // Attmept to fix the alpha
         //for (auto i = 0; i < desc.Width * desc.Height; i++)
