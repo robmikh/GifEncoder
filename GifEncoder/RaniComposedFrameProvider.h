@@ -8,6 +8,7 @@ struct RaniComposedFrameProvider : IComposedFrameProvider
 	{
 		m_project = std::move(project);
 	}
+	~RaniComposedFrameProvider() {}
 
 	uint32_t Width() override { return m_project->Width; }
 	uint32_t Height() override { return m_project->Height; }
