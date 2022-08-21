@@ -177,10 +177,10 @@ int __stdcall wmain()
         }
 
         // TEMP DEBUG
-        {
-            auto debugFileName = ImageViewerFileNameFromSize("debug_indexed", desc.Width, desc.Height);
-            WriteIndexedPixelBytesToFileAsBgra8(debugFileName, indexPixelBytes);
-        }
+        //{
+        //    auto debugFileName = ImageViewerFileNameFromSize("debug_indexed", desc.Width, desc.Height);
+        //    WriteIndexedPixelBytesToFileAsBgra8(debugFileName, indexPixelBytes);
+        //}
 
         // Create a new bitmap with the fixed bytes
         winrt::com_ptr<IWICBitmap> wicBitmapFixed;
@@ -237,10 +237,10 @@ int __stdcall wmain()
             }
 
             // TEMP DEBUG
-            {
-                auto debugFileName = ImageViewerFileNameFromSize("debug", desc.Width, desc.Height);
-                WriteBgra8PixelsToFile(debugFileName, bytes);
-            }
+            //{
+            //    auto debugFileName = ImageViewerFileNameFromSize("debug", desc.Width, desc.Height);
+            //    WriteBgra8PixelsToFile(debugFileName, bytes);
+            //}
         }
 
         // Write out bitmap and commit the frame
