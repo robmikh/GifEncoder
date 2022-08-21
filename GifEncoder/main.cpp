@@ -114,8 +114,8 @@ int __stdcall wmain()
     auto inputFile = util::GetStorageFileFromPathAsync(path.wstring()).get();
     auto project = LoadRaniProjectFromStorageFileAsync(inputFile).get();
 
-    // Create a bitmap for each composed layer
-    std::vector<winrt::com_ptr<ID2D1Bitmap1>> frames;
+    // Create a texture for each composed layer
+    std::vector<winrt::com_ptr<ID3D11Texture2D>> frames;
     for (auto&& frame : project->Frames)
     {
         D3D11_TEXTURE2D_DESC desc = {};
@@ -134,6 +134,13 @@ int __stdcall wmain()
 
         auto backgroundColor = project->BackgroundColor;
         auto clearColor = D2D1_COLOR_F{ static_cast<float>(backgroundColor.R) / 255.0f, static_cast<float>(backgroundColor.G) / 255.0f, static_cast<float>(backgroundColor.B) / 255.0f, static_cast<float>(backgroundColor.A) / 255.0f };
+        
+        // TEMP DEBUG
+        project->BackgroundColor.A = 0;
+        project->BackgroundColor.R = 255;
+        project->BackgroundColor.G = 255;
+        project->BackgroundColor.B = 255;
+
         d2dContext->BeginDraw();
         d2dContext->Clear(&clearColor);
         for (auto&& layer : frame.Layers)
@@ -153,7 +160,7 @@ int __stdcall wmain()
         winrt::check_hresult(d2dContext->EndDraw());
         d2dContext->SetTarget(nullptr);
 
-        frames.push_back(renderTarget);
+        frames.push_back(renderTargetTexture);
     }
 
     // Compute the frame delay
@@ -162,14 +169,85 @@ int __stdcall wmain()
     auto frameDelay = millisconds.count() / 10;
 
     // Encode each frame
-    for (auto&& frameBitmap : frames)
+    auto frameIndex = 0;
+    for (auto&& frameTexture : frames)
     {
+        // Create our converter
+        winrt::com_ptr<IWICFormatConverter> wicConverter;
+        winrt::check_hresult(wicFactory->CreateFormatConverter(wicConverter.put()));
+
+        // Create a WIC bitmap from our texture
+        D3D11_TEXTURE2D_DESC desc = {};
+        frameTexture->GetDesc(&desc);
+        auto bytes = util::CopyBytesFromTexture(frameTexture);
+        auto bytesPerPixel = util::GetBytesPerPixel(desc.Format);
+        winrt::com_ptr<IWICBitmap> wicBitmap;
+        winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
+            desc.Width,
+            desc.Height,
+            GUID_WICPixelFormat32bppBGRA,
+            bytesPerPixel * desc.Width,
+            bytes.size(),
+            bytes.data(),
+            wicBitmap.put()));
+
+        // Create a pallette for our bitmap
+        winrt::com_ptr<IWICPalette> wicPalette;
+        winrt::check_hresult(wicFactory->CreatePalette(wicPalette.put()));
+        winrt::check_hresult(wicPalette->InitializeFromBitmap(wicBitmap.get(), 256, true));
+
+        // We need to find which color is our transparent one
+        uint32_t numColors = 0;
+        winrt::check_hresult(wicPalette->GetColorCount(&numColors));
+        std::vector<WICColor> colors(numColors, 0);
+        winrt::check_hresult(wicPalette->GetColors(numColors, colors.data(), &numColors));
+        auto transparentColorIndex = -1;
+        for (auto i = 0; i < colors.size(); i++)
+        {
+            if (colors[i] == 0)
+            {
+                transparentColorIndex = i;
+                break;
+            }
+        }
+
+        // TEMP DEBUG
+        //for (auto&& color : colors)
+        //{
+        //    wprintf(L"0x%08x\n", color);
+        //}
+        //wprintf(L"\n");
+
+        // Convert our frame using the palette
+        winrt::check_hresult(wicConverter->Initialize(
+            wicBitmap.get(),
+            GUID_WICPixelFormat8bppIndexed,
+            WICBitmapDitherTypeNone, // ???
+            wicPalette.get(),
+            0.0,
+            WICBitmapPaletteTypeFixedWebPalette));
+
+        std::vector<uint8_t> readbackBytes(desc.Width * desc.Height, 0);
+        winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, readbackBytes.size(), readbackBytes.data()));
+        {
+            std::stringstream stringStream;
+            stringStream << "debug_indexed_" << desc.Width << "x" << desc.Height << ".bin";
+            std::ofstream file(stringStream.str(), std::ios::out | std::ios::binary);
+            for (auto&& index : readbackBytes)
+            {
+                std::vector<uint8_t> bgraBytes(4, 0);
+                bgraBytes[0] = index;
+                bgraBytes[1] = index;
+                bgraBytes[2] = index;
+                bgraBytes[3] = 255;
+                file.write(reinterpret_cast<const char*>(bgraBytes.data()), bgraBytes.size());
+            }
+        }
+
         // Setup our WIC frame
         winrt::com_ptr<IWICBitmapFrameEncode> wicFrame;
         winrt::check_hresult(wicEncoder->CreateNewFrame(wicFrame.put(), nullptr));
         winrt::check_hresult(wicFrame->Initialize(nullptr));
-        auto wicPixelFormat = GUID_WICPixelFormat32bppBGRA;
-        winrt::check_hresult(wicFrame->SetPixelFormat(&wicPixelFormat));
 
         // Write frame metadata
         winrt::com_ptr<IWICMetadataQueryWriter> metadata;
@@ -181,17 +259,47 @@ int __stdcall wmain()
             delayValue.uiVal = static_cast<unsigned short>(frameDelay);
             winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/Delay", &delayValue));
         }
+        // Transparency
+        if (transparentColorIndex >= 0 && frameIndex > 0) 
+        {
+            {
+                PROPVARIANT transparencyValue = {};
+                transparencyValue.vt = VT_BOOL;
+                transparencyValue.boolVal = TRUE;
+                winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/TransparencyFlag", &transparencyValue));
+            }
 
-        // Write the frame to our image (this must come after you write the metadata)
-        WICImageParameters frameParams = {};
-        frameParams.PixelFormat.format = DXGI_FORMAT_B8G8R8A8_UNORM;
-        frameParams.PixelFormat.alphaMode = D2D1_ALPHA_MODE_PREMULTIPLIED;
-        frameParams.DpiX = 96.0f;
-        frameParams.DpiY = 96.0f;
-        frameParams.PixelWidth = project->Width;
-        frameParams.PixelHeight = project->Height;
-        winrt::check_hresult(wicImageEncoder->WriteFrame(frameBitmap.get(), wicFrame.get(), &frameParams));
+            {
+                PROPVARIANT transparencyIndex = {};
+                transparencyIndex.vt = VT_UI1;
+                transparencyIndex.bVal = static_cast<uint8_t>(transparentColorIndex);
+                transparencyIndex.bVal = 0;
+                winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/TransparentColorIndex", &transparencyIndex));
+            }
+        }
+
+        if (frameIndex > 0)
+        {
+            {
+                PROPVARIANT disposalValue = {};
+                disposalValue.vt = VT_UI1;
+                disposalValue.bVal = 1;
+                winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/Disposal", &disposalValue));
+            }
+
+            {
+                std::stringstream stringStream;
+                stringStream << "debug_" << desc.Width << "x" << desc.Height << ".bin";
+                std::ofstream file(stringStream.str(), std::ios::out | std::ios::binary);
+                file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            }
+        }
+
+        // Write out bitmap and commit the frame
+        winrt::check_hresult(wicFrame->WriteSource(wicConverter.get(), nullptr));
         winrt::check_hresult(wicFrame->Commit());
+
+        frameIndex++;
     }
     winrt::check_hresult(wicEncoder->Commit());
 

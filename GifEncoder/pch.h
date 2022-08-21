@@ -42,6 +42,8 @@
 #include <mutex>
 #include <filesystem>
 #include <cwctype>
+#include <sstream>
+#include <fstream>
 
 // robmikh.common
 #include <robmikh.common/composition.interop.h>
