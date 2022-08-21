@@ -192,8 +192,10 @@ inline std::vector<winrt::com_ptr<ID3D11Texture2D>> ComposeFrames(
         auto clearColor = D2D1_COLOR_F{ static_cast<float>(backgroundColor.R) / 255.0f, static_cast<float>(backgroundColor.G) / 255.0f, static_cast<float>(backgroundColor.B) / 255.0f, static_cast<float>(backgroundColor.A) / 255.0f };
         d2dContext->BeginDraw();
         d2dContext->Clear(&clearColor);
-        for (auto&& layer : frame.Layers)
+        for (int i = static_cast<int>(frame.Layers.size() - 1); i >= 0; i--)
         {
+            auto&& layer = frame.Layers[i];
+
             if (layer.Visible)
             {
                 auto pngDataStream = winrt::Windows::Storage::Streams::InMemoryRandomAccessStream();
