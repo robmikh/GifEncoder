@@ -1,6 +1,4 @@
 ﻿#include "pch.h"
-#include "PaletteIndexLUT.h"
-#include "ColorQuantizer.h"
 #include "TransparencyFixer.h"
 
 namespace winrt
@@ -183,8 +181,6 @@ int __stdcall wmain()
     // Use 10ms units
     auto frameDelay = millisconds.count() / 10;
 
-    //auto paletteLUTGenerator = PaletteIndexLUT(d3dDevice, d3dContext);
-    //auto quantizer = ColorQuantizer(d3dDevice, d3dContext, project->Width, project->Height);
     auto transparencyFixer = TransparencyFixer(d3dDevice, d3dContext, project->Width, project->Height);
     std::vector<uint8_t> indexPixelBytes(project->Width * project->Height, 0);
 
@@ -231,36 +227,6 @@ int __stdcall wmain()
             }
         }
 
-        // Build the lookup table for our palette
-        //std::vector<uint8_t> bgraPaletteBytes(colors.size() * 4, 0);
-        //for (auto i = 0; i < colors.size(); i++)
-        //{
-        //    auto&& wicColor = colors[i];
-        //
-        //    auto alpha = (0xFF000000 & wicColor) >> 24;
-        //    auto red = (0x00FF0000 & wicColor) >> 16;
-        //    auto green = (0x0000FF00 & wicColor) >> 8;
-        //    auto blue = 0x000000FF & wicColor;
-        //
-        //    bgraPaletteBytes[(i * 4) + 3] = static_cast<uint8_t>(alpha);
-        //    bgraPaletteBytes[(i * 4) + 2] = static_cast<uint8_t>(red);
-        //    bgraPaletteBytes[(i * 4) + 1] = static_cast<uint8_t>(green);
-        //    bgraPaletteBytes[(i * 4) + 0] = static_cast<uint8_t>(blue);
-        //}
-        //paletteLUTGenerator.Generate(bgraPaletteBytes, transparentColorIndex);
-
-        // Quanitze the pixels
-        //quantizer.Quantize(frameTexture, paletteLUTGenerator.Srv(), transparentColorIndex, indexPixelBytes);
-
-
-
-        // TEMP DEBUG
-        //for (auto&& color : colors)
-        //{
-        //    wprintf(L"0x%08x\n", color);
-        //}
-        //wprintf(L"\n");
-
         // Convert our frame using the palette
         winrt::check_hresult(wicConverter->Initialize(
             wicBitmap.get(),
@@ -275,16 +241,6 @@ int __stdcall wmain()
         {
             transparencyFixer.ProcessInput(frameTexture, transparentColorIndex, indexPixelBytes);
         }
-
-        // Attmept to fix the alpha
-        //for (auto i = 0; i < desc.Width * desc.Height; i++)
-        //{
-        //    auto alpha = bytes[(i * 4) + 3];
-        //    if (alpha == 0)
-        //    {
-        //        readbackBytes[i] = transparentColorIndex;
-        //    }
-        //}
 
         {
             std::stringstream stringStream;
@@ -342,7 +298,6 @@ int __stdcall wmain()
                 PROPVARIANT transparencyIndex = {};
                 transparencyIndex.vt = VT_UI1;
                 transparencyIndex.bVal = static_cast<uint8_t>(transparentColorIndex);
-                //transparencyIndex.bVal = 0;
                 winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/TransparentColorIndex", &transparencyIndex));
             }
         }
