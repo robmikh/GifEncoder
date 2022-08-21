@@ -135,6 +135,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="d2dHelpers.h" />
+    <ClInclude Include="DebugFileWriters.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="RaniFormat.h" />
     <ClInclude Include="TransparencyFixer.h" />

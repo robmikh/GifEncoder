@@ -1,6 +1,7 @@
 ﻿#include "pch.h"
 #include "TransparencyFixer.h"
 #include "RaniFormat.h"
+#include "DebugFileWriters.h"
 
 namespace winrt
 {
@@ -177,18 +178,8 @@ int __stdcall wmain()
 
         // TEMP DEBUG
         {
-            std::stringstream stringStream;
-            stringStream << "debug_indexed_" << desc.Width << "x" << desc.Height << ".bin";
-            std::ofstream file(stringStream.str(), std::ios::out | std::ios::binary);
-            for (auto&& index : indexPixelBytes)
-            {
-                std::vector<uint8_t> bgraBytes(4, 0);
-                bgraBytes[0] = index;
-                bgraBytes[1] = index;
-                bgraBytes[2] = index;
-                bgraBytes[3] = 255;
-                file.write(reinterpret_cast<const char*>(bgraBytes.data()), bgraBytes.size());
-            }
+            auto debugFileName = ImageViewerFileNameFromSize("debug_indexed", desc.Width, desc.Height);
+            WriteIndexedPixelBytesToFileAsBgra8(debugFileName, indexPixelBytes);
         }
 
         // Create a new bitmap with the fixed bytes
@@ -245,11 +236,10 @@ int __stdcall wmain()
                 winrt::check_hresult(metadata->SetMetadataByName(L"/grctlext/Disposal", &disposalValue));
             }
 
+            // TEMP DEBUG
             {
-                std::stringstream stringStream;
-                stringStream << "debug_" << desc.Width << "x" << desc.Height << ".bin";
-                std::ofstream file(stringStream.str(), std::ios::out | std::ios::binary);
-                file.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+                auto debugFileName = ImageViewerFileNameFromSize("debug", desc.Width, desc.Height);
+                WriteBgra8PixelsToFile(debugFileName, bytes);
             }
         }
 
