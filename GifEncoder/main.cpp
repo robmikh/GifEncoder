@@ -125,10 +125,46 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         }
     };
     std::sort(sortedColorIndexes.begin(), sortedColorIndexes.end(), ColorIndexComparitor{ colorDatas });
+    std::vector<size_t> selectedColors;
+    selectedColors.reserve(sortedColorIndexes.size());
     for (auto i = 0; i < 255; i++)
     {
-        globalPaletteColors.push_back(colorDatas[sortedColorIndexes[i]].Color);
+        selectedColors.push_back(sortedColorIndexes[i]);
     }
+    for (auto i = 0; i < selectedColors.size(); i++)
+    {
+        auto currentColorIndex = selectedColors[i];
+
+        // Find the closest color that isn't ourselves
+        auto minDistance = FLT_MAX;
+        auto closestColorSecondaryIndex = -1;
+        for (auto j = 0; j < selectedColors.size(); j++)
+        {
+            auto otherColorIndex = selectedColors[j];
+            if (currentColorIndex == otherColorIndex)
+            {
+                continue;
+            }
+
+            auto distance = distances[currentColorIndex][otherColorIndex];
+            if (minDistance > distance)
+            {
+                minDistance = distance;
+                closestColorSecondaryIndex = j;
+            }
+        }
+
+        if (closestColorSecondaryIndex >= 0 && minDistance < 3.0f)
+        {
+            selectedColors.erase(selectedColors.begin() + closestColorSecondaryIndex);
+        }
+
+        
+    }
+    for (auto&& selectedColor : selectedColors)
+    {
+        globalPaletteColors.push_back(colorDatas[selectedColor].Color);
+    }   
 
     // Create WIC Encoder
     auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);
@@ -244,7 +280,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
             WICBitmapDitherTypeNone, // ???
             wicPalette.get(),
             0.0,
-            WICBitmapPaletteTypeFixedWebPalette));
+            WICBitmapPaletteTypeCustom));
         winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, static_cast<uint32_t>(indexPixelBytes.size()), indexPixelBytes.data()));
 
         std::optional<DiffInfo> diffInfoOpt = std::nullopt;
