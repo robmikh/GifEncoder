@@ -12,7 +12,7 @@ class HistogramGenerator
 public:
 	HistogramGenerator(winrt::com_ptr<ID3D11Device> const& d3dDevice, uint32_t width, uint32_t height);
 
-	std::vector<ColorCount> Generate(std::vector<ComposedFrame> const& frames);
+	std::tuple<std::vector<ColorCount>, winrt::com_ptr<ID3D11Buffer>> Generate(std::vector<ComposedFrame> const& frames);
 
 private:
 	uint32_t m_width = 0;

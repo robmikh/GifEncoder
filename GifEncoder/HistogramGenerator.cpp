@@ -133,7 +133,7 @@ HistogramGenerator::HistogramGenerator(
 	winrt::check_hresult(d3dDevice->CreateComputeShader(shaders::accumulate::g_main, ARRAYSIZE(shaders::accumulate::g_main), nullptr, m_accmumulateShader.put()));
 }
 
-std::vector<ColorCount> HistogramGenerator::Generate(std::vector<ComposedFrame> const& frames)
+std::tuple<std::vector<ColorCount>, winrt::com_ptr<ID3D11Buffer>> HistogramGenerator::Generate(std::vector<ComposedFrame> const& frames)
 {
 	// Clear our color tally texture
 	{
@@ -205,7 +205,7 @@ std::vector<ColorCount> HistogramGenerator::Generate(std::vector<ComposedFrame> 
 		D3D11_BUFFER_DESC desc = {};
 		desc.ByteWidth = paddedSize * shaderColorCount.Count;
 		desc.Usage = D3D11_USAGE_DEFAULT;
-		desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS;
+		desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 		desc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
 		desc.StructureByteStride = paddedSize;
 		winrt::check_hresult(m_d3dDevice->CreateBuffer(&desc, nullptr, accumulateBuffer.put()));
@@ -250,10 +250,19 @@ std::vector<ColorCount> HistogramGenerator::Generate(std::vector<ComposedFrame> 
 	}
 	
 	// Sort color counts
-	std::sort(result.begin(), result.end(), [](ColorCount a, ColorCount b)
-		{
-			return a.Count < b.Count;
-		});
+	//std::sort(result.begin(), result.end(), [](ColorCount a, ColorCount b)
+	//	{
+	//		return a.Count < b.Count;
+	//	});
 
-	return result;
+	// Reset pipeline state
+	m_d3dContext->CSSetShader(nullptr, nullptr, 0);
+	srvs = { nullptr };
+	m_d3dContext->CSSetShaderResources(0, static_cast<uint32_t>(srvs.size()), srvs.data());
+	constants = { nullptr };
+	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());
+	uavs = { nullptr };
+	m_d3dContext->CSSetUnorderedAccessViews(0, static_cast<uint32_t>(uavs.size()), uavs.data(), nullptr);
+
+	return { result, accumulateBuffer };
 }

@@ -3,6 +3,7 @@
 #include "IComposedFrameProvider.h"
 #include "DebugFileWriters.h"
 #include "HistogramGenerator.h"
+#include "ColorDistanceGenerator.h"
 
 namespace winrt
 {
@@ -77,7 +78,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     auto frames = inputFrameProvider->GetFrames(d3dDevice, d2dContext);
 
     auto histogramGenerator = HistogramGenerator(d3dDevice, width, height);
-    auto colorDatas = histogramGenerator.Generate(frames);
+    auto [colorDatas, colorsBuffer] = histogramGenerator.Generate(frames);
 
     // TEMP DEBUG
     {
@@ -101,6 +102,8 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
 
         co_await winrt::FileIO::WriteTextAsync(histogramFile, text, winrt::UnicodeEncoding::Utf8);
     }
+
+    auto distances = ColorDistanceGenerator::Generate(d3dDevice, d3dContext, colorsBuffer, colorDatas.size());
 
     // Create WIC Encoder
     auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);

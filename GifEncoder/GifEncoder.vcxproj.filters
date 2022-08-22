@@ -3,6 +3,9 @@
   <ItemGroup>
     <None Include="PropertySheet.props" />
     <None Include="packages.config" />
+    <None Include="ColorHelpers.hlsli">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
@@ -11,6 +14,7 @@
     <ClCompile Include="ComposedFrameProvider.cpp" />
     <ClCompile Include="GifComposedFrameProvider.cpp" />
     <ClCompile Include="HistogramGenerator.cpp" />
+    <ClCompile Include="ColorDistanceGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -24,6 +28,7 @@
     <ClInclude Include="wicHelpers.h" />
     <ClInclude Include="HistogramGenerator.h" />
     <ClInclude Include="BufferHelpers.h" />
+    <ClInclude Include="ColorDistanceGenerator.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="ColorTally.hlsl">
@@ -36,6 +41,12 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="CountColorTallies.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="RgbToLab.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="ComputeLabColorDistances.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>
