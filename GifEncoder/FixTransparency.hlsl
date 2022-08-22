@@ -16,6 +16,7 @@ struct DiffInfo
 
 Texture2D<unorm float4> currentTexture : register(t0);
 Texture2D<unorm float4> previousTexture : register(t1);
+Texture2D<uint> previousIndexTexture : register(t2);
 RWTexture2D<uint> outputTexture : register(u0);
 RWStructuredBuffer<DiffInfo> diffBuffer : register(u1);
 
@@ -28,12 +29,17 @@ void main( uint3 DTid : SV_DispatchThreadID )
     {
         float4 currentPixel = currentTexture[position];
         float4 previousPixel = previousTexture[position];
-
+        
+        uint previousIndex = previousIndexTexture[position];
         uint index = outputTexture[position];
-        if ((currentPixel.x != previousPixel.x) || 
-            (currentPixel.y != previousPixel.y) || 
-            (currentPixel.z != previousPixel.z) ||
-            (currentPixel.w != previousPixel.w))
+
+        bool sameIndex = previousIndex == index;
+        bool samePixel = (currentPixel.x == previousPixel.x) &&
+            (currentPixel.y == previousPixel.y) &&
+            (currentPixel.z == previousPixel.z) &&
+            (currentPixel.w == previousPixel.w);
+
+        if (!samePixel && !sameIndex)
         {
             uint value = 0;
             InterlockedAdd(diffBuffer[0].NumDifferingPixels, 1, value);

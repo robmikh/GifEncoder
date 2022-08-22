@@ -22,7 +22,7 @@ TransparencyFixer::TransparencyFixer(
 {
 	m_d3dContext = d3dContext;
 
-	// Create current and previous textures
+	// Create current texture
 	{
 		D3D11_TEXTURE2D_DESC desc = {};
 		desc.Width = width;
@@ -38,6 +38,27 @@ TransparencyFixer::TransparencyFixer(
 	}
 	winrt::check_hresult(d3dDevice->CreateShaderResourceView(m_currentTexture.get(), nullptr, m_currentSrv.put()));
 	winrt::check_hresult(d3dDevice->CreateShaderResourceView(m_previousTexture.get(), nullptr, m_previousSrv.put()));
+
+	// Create current previous textures
+	{
+		D3D11_TEXTURE2D_DESC desc = {};
+		desc.Width = width;
+		desc.Height = height;
+		desc.MipLevels = 1;
+		desc.ArraySize = 1;
+		desc.Format = DXGI_FORMAT_R8_UINT;
+		desc.SampleDesc.Count = 1;
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_previousIndexTexture.put()));
+
+		desc.Usage = D3D11_USAGE_STAGING;
+		desc.BindFlags = 0;
+		desc.MiscFlags = 0;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_previousIndexStagingTexture.put()));
+	}
+	winrt::check_hresult(d3dDevice->CreateShaderResourceView(m_previousIndexTexture.get(), nullptr, m_previousIndexSrv.put()));
 
 	// Create output and staging textures
 	{
@@ -119,9 +140,29 @@ TransparencyFixer::TransparencyFixer(
 
 }
 
-void TransparencyFixer::InitPrevious(winrt::com_ptr<ID3D11Texture2D> const& previousTexture)
+void TransparencyFixer::InitPrevious(winrt::com_ptr<ID3D11Texture2D> const& texture, std::vector<uint8_t> const& indexPixels)
 {
-	m_d3dContext->CopyResource(m_previousTexture.get(), previousTexture.get());
+	m_d3dContext->CopyResource(m_previousTexture.get(), texture.get());
+	D3D11_TEXTURE2D_DESC desc = {};
+	m_previousIndexTexture->GetDesc(&desc);
+	WINRT_VERIFY(indexPixels.size() == desc.Width * desc.Height);
+
+	{
+		D3D11_MAPPED_SUBRESOURCE mapped = {};
+		winrt::check_hresult(m_d3dContext->Map(m_previousIndexStagingTexture.get(), 0, D3D11_MAP_WRITE, 0, &mapped));
+		auto stride = desc.Width;
+		auto dest = reinterpret_cast<byte*>(mapped.pData);
+		auto source = indexPixels.data();
+		for (auto i = 0; i < (int)desc.Height; i++)
+		{
+			memcpy(dest, source, stride);
+
+			dest += mapped.RowPitch;
+			source += stride;
+		}
+		m_d3dContext->Unmap(m_previousIndexStagingTexture.get(), 0);
+	}
+	m_d3dContext->CopyResource(m_previousIndexTexture.get(), m_previousIndexStagingTexture.get());
 }
 
 DiffInfo TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& texture, int transparentColorIndex, std::vector<uint8_t>& indexPixels)
@@ -169,7 +210,7 @@ DiffInfo TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& 
 
 	// Setup our pipeline
 	m_d3dContext->CSSetShader(m_shader.get(), nullptr, 0);
-	std::vector<ID3D11ShaderResourceView*> srvs = { m_currentSrv.get(), m_previousSrv.get()};
+	std::vector<ID3D11ShaderResourceView*> srvs = { m_currentSrv.get(), m_previousSrv.get(), m_previousIndexSrv.get() };
 	m_d3dContext->CSSetShaderResources(0, static_cast<uint32_t>(srvs.size()), srvs.data());
 	std::vector<ID3D11Buffer*> constants = { m_frameInfoBuffer.get() };
 	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());
@@ -204,10 +245,11 @@ DiffInfo TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& 
 
 	// Copy current to previous
 	m_d3dContext->CopyResource(m_previousTexture.get(), m_currentTexture.get());
+	m_d3dContext->CopyResource(m_previousIndexTexture.get(), m_outputTexture.get());
 
 	// Unbind pipeline
 	m_d3dContext->CSSetShader(nullptr, nullptr, 0);
-	srvs = { nullptr, nullptr };
+	srvs = { nullptr, nullptr, nullptr };
 	m_d3dContext->CSSetShaderResources(0, static_cast<uint32_t>(srvs.size()), srvs.data());
 	constants = { nullptr };
 	m_d3dContext->CSSetConstantBuffers(0, static_cast<uint32_t>(constants.size()), constants.data());

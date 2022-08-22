@@ -299,7 +299,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         }
         else
         {
-            transparencyFixer.InitPrevious(frameTexture);
+            transparencyFixer.InitPrevious(frameTexture, indexPixelBytes);
         }
 
         // TEMP DEBUG
