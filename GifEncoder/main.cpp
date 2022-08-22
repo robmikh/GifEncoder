@@ -109,14 +109,25 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     // Let's just sort and pick the top 255 colors to test global palette encoding.
     std::vector<winrt::Color> globalPaletteColors;
     globalPaletteColors.reserve(255);
-    std::vector<ColorCount> sortedColors = colorDatas;
-    std::sort(sortedColors.begin(), sortedColors.end(), [](ColorCount a, ColorCount b)
-    	{
-    		return a.Count > b.Count;
-    	});
+    std::vector<size_t> sortedColorIndexes;
+    sortedColorIndexes.reserve(colorDatas.size());
+    for (auto i = 0; i < colorDatas.size(); i++)
+    {
+        sortedColorIndexes.push_back(i);
+    }
+    struct ColorIndexComparitor
+    {
+        std::vector<ColorCount> const& ColorDatas;
+
+        bool operator()(size_t a, size_t b) const
+        {
+            return ColorDatas[a].Count > ColorDatas[b].Count;
+        }
+    };
+    std::sort(sortedColorIndexes.begin(), sortedColorIndexes.end(), ColorIndexComparitor{ colorDatas });
     for (auto i = 0; i < 255; i++)
     {
-        globalPaletteColors.push_back(sortedColors[i].Color);
+        globalPaletteColors.push_back(colorDatas[sortedColorIndexes[i]].Color);
     }
 
     // Create WIC Encoder
