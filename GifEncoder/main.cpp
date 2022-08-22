@@ -119,6 +119,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
 
     // Encode each frame
     auto frameIndex = 0;
+    winrt::TimeSpan unusedDelay = {};
     for (auto&& frame : frames)
     {
         // Create our converter
@@ -180,6 +181,11 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
             {
                 diffInfoOpt = std::optional(std::move(info));
             }
+            else
+            {
+                unusedDelay = frame.Delay;
+                continue;
+            }
         }
         else
         {
@@ -239,7 +245,9 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         winrt::check_hresult(wicFrame->Initialize(nullptr));
 
         // Compute the frame delay
-        auto millisconds = std::chrono::duration_cast<std::chrono::milliseconds>(frame.Delay);
+        auto delay = frame.Delay + unusedDelay;
+        unusedDelay = {};
+        auto millisconds = std::chrono::duration_cast<std::chrono::milliseconds>(delay);
         // Use 10ms units
         auto frameDelay = millisconds.count() / 10;
 
