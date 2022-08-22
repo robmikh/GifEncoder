@@ -62,3 +62,5 @@
 #include <robmikh.common/wcliparse.h>
 #include "d2dHelpers.h"
 #include "wicHelpers.h"
+
+#include "BufferHelpers.h"

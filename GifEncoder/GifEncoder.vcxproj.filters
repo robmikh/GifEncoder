@@ -10,6 +10,7 @@
     <ClCompile Include="TransparencyFixer.cpp" />
     <ClCompile Include="ComposedFrameProvider.cpp" />
     <ClCompile Include="GifComposedFrameProvider.cpp" />
+    <ClCompile Include="HistogramGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -21,8 +22,26 @@
     <ClInclude Include="RaniComposedFrameProvider.h" />
     <ClInclude Include="GifComposedFrameProvider.h" />
     <ClInclude Include="wicHelpers.h" />
+    <ClInclude Include="HistogramGenerator.h" />
+    <ClInclude Include="BufferHelpers.h" />
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="FixTransparency.hlsl" />
+    <FxCompile Include="ColorTally.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="FixTransparency.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="AccumulateColorTallies.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="CountColorTallies.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{8bc5fd6b-44cb-4e9d-8985-52c490b902d7}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
