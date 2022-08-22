@@ -183,7 +183,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
             }
             else
             {
-                unusedDelay = frame.Delay;
+                unusedDelay = unusedDelay + frame.Delay;
                 continue;
             }
         }
