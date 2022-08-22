@@ -104,6 +104,20 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     }
 
     auto distances = ColorDistanceGenerator::Generate(d3dDevice, d3dContext, colorsBuffer, colorDatas.size());
+    
+    // TODO: Properly pick colors
+    // Let's just sort and pick the top 255 colors to test global palette encoding.
+    std::vector<winrt::Color> globalPaletteColors;
+    globalPaletteColors.reserve(255);
+    std::vector<ColorCount> sortedColors = colorDatas;
+    std::sort(sortedColors.begin(), sortedColors.end(), [](ColorCount a, ColorCount b)
+    	{
+    		return a.Count > b.Count;
+    	});
+    for (auto i = 0; i < 255; i++)
+    {
+        globalPaletteColors.push_back(sortedColors[i].Color);
+    }
 
     // Create WIC Encoder
     auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);
@@ -147,6 +161,24 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     std::vector<uint8_t> indexPixelBytes(width * height, 0);
     std::vector<uint8_t> tempBuffer;
 
+    // Create our WIC palette
+    winrt::com_ptr<IWICPalette> globalWicPalette;
+    winrt::check_hresult(wicFactory->CreatePalette(globalWicPalette.put()));
+    std::vector<WICColor> wicColors;
+    wicColors.reserve(256);
+    for (auto&& color : globalPaletteColors)
+    {
+        uint32_t colorAsNum = 0;
+        colorAsNum |= color.A << 24;
+        colorAsNum |= color.R << 16;
+        colorAsNum |= color.G << 8;
+        colorAsNum |= color.B;
+
+        wicColors.push_back(colorAsNum);
+    }
+    wicColors.push_back(0);
+    winrt::check_hresult(globalWicPalette->InitializeCustom(wicColors.data(), static_cast<uint32_t>(wicColors.size())));
+
     // Encode each frame
     auto frameIndex = 0;
     winrt::TimeSpan unusedDelay = {};
@@ -175,8 +207,9 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
 
         // Create a pallette for our bitmap
         winrt::com_ptr<IWICPalette> wicPalette;
-        winrt::check_hresult(wicFactory->CreatePalette(wicPalette.put()));
-        winrt::check_hresult(wicPalette->InitializeFromBitmap(wicBitmap.get(), 256, true));
+        //winrt::check_hresult(wicFactory->CreatePalette(wicPalette.put()));
+        //winrt::check_hresult(wicPalette->InitializeFromBitmap(wicBitmap.get(), 256, true));
+        wicPalette = globalWicPalette;
 
         // We need to find which color is our transparent one
         uint32_t numColors = 0;
