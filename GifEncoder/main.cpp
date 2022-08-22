@@ -4,6 +4,8 @@
 #include "DebugFileWriters.h"
 #include "HistogramGenerator.h"
 #include "ColorDistanceGenerator.h"
+#include "PaletteIndexLUT.h"
+#include "ColorQuantizer.h"
 
 namespace winrt
 {
@@ -164,7 +166,7 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
     for (auto&& selectedColor : selectedColors)
     {
         globalPaletteColors.push_back(colorDatas[selectedColor].Color);
-    }   
+    }
 
     // Create WIC Encoder
     auto wicFactory = winrt::create_instance<IWICImagingFactory2>(CLSID_WICImagingFactory2, CLSCTX_INPROC_SERVER);
@@ -204,6 +206,9 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         }
     }
 
+    auto lut = PaletteIndexLUT(d3dDevice, d3dContext);
+    lut.Generate(globalPaletteColors);
+    auto quantizer = ColorQuantizer(d3dDevice, d3dContext, width, height);
     auto transparencyFixer = TransparencyFixer(d3dDevice, d3dContext, width, height);
     std::vector<uint8_t> indexPixelBytes(width * height, 0);
     std::vector<uint8_t> tempBuffer;
@@ -240,17 +245,17 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         // Create a WIC bitmap from our texture
         D3D11_TEXTURE2D_DESC desc = {};
         frameTexture->GetDesc(&desc);
-        auto bytes = util::CopyBytesFromTexture(frameTexture);
-        auto bytesPerPixel = 4;
-        winrt::com_ptr<IWICBitmap> wicBitmap;
-        winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
-            desc.Width,
-            desc.Height,
-            GUID_WICPixelFormat32bppBGRA,
-            bytesPerPixel * desc.Width,
-            static_cast<uint32_t>(bytes.size()),
-            bytes.data(),
-            wicBitmap.put()));
+        //auto bytes = util::CopyBytesFromTexture(frameTexture);
+        //auto bytesPerPixel = 4;
+        //winrt::com_ptr<IWICBitmap> wicBitmap;
+        //winrt::check_hresult(wicFactory->CreateBitmapFromMemory(
+        //    desc.Width,
+        //    desc.Height,
+        //    GUID_WICPixelFormat32bppBGRA,
+        //    bytesPerPixel * desc.Width,
+        //    static_cast<uint32_t>(bytes.size()),
+        //    bytes.data(),
+        //    wicBitmap.put()));
 
         // Create a pallette for our bitmap
         winrt::com_ptr<IWICPalette> wicPalette;
@@ -259,29 +264,32 @@ winrt::IAsyncAction MainAsync(bool useDebugLayer, std::wstring inputPath, std::w
         wicPalette = globalWicPalette;
 
         // We need to find which color is our transparent one
-        uint32_t numColors = 0;
-        winrt::check_hresult(wicPalette->GetColorCount(&numColors));
-        std::vector<WICColor> colors(numColors, 0);
-        winrt::check_hresult(wicPalette->GetColors(numColors, colors.data(), &numColors));
-        auto transparentColorIndex = -1;
-        for (auto i = 0; i < colors.size(); i++)
-        {
-            if (colors[i] == 0)
-            {
-                transparentColorIndex = i;
-                break;
-            }
-        }
+        //uint32_t numColors = 0;
+        //winrt::check_hresult(wicPalette->GetColorCount(&numColors));
+        //std::vector<WICColor> colors(numColors, 0);
+        //winrt::check_hresult(wicPalette->GetColors(numColors, colors.data(), &numColors));
+        //auto transparentColorIndex = -1;
+        //for (auto i = 0; i < colors.size(); i++)
+        //{
+        //    if (colors[i] == 0)
+        //    {
+        //        transparentColorIndex = i;
+        //        break;
+        //    }
+        //}
+        auto transparentColorIndex = wicColors.size() - 1;
 
         // Convert our frame using the palette
-        winrt::check_hresult(wicConverter->Initialize(
-            wicBitmap.get(),
-            GUID_WICPixelFormat8bppIndexed,
-            WICBitmapDitherTypeNone, // ???
-            wicPalette.get(),
-            0.0,
-            WICBitmapPaletteTypeCustom));
-        winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, static_cast<uint32_t>(indexPixelBytes.size()), indexPixelBytes.data()));
+        //winrt::check_hresult(wicConverter->Initialize(
+        //    wicBitmap.get(),
+        //    GUID_WICPixelFormat8bppIndexed,
+        //    WICBitmapDitherTypeNone, // ???
+        //    wicPalette.get(),
+        //    0.0,
+        //    WICBitmapPaletteTypeCustom));
+        //winrt::check_hresult(wicConverter->CopyPixels(nullptr, desc.Width, static_cast<uint32_t>(indexPixelBytes.size()), indexPixelBytes.data()));
+
+        quantizer.Quantize(frameTexture, lut.Srv(), indexPixelBytes);
 
         std::optional<DiffInfo> diffInfoOpt = std::nullopt;
         if (transparentColorIndex >= 0 && frameIndex > 0)
