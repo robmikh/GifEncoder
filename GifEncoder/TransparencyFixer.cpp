@@ -73,10 +73,15 @@ TransparencyFixer::TransparencyFixer(
 		desc.BindFlags = D3D11_BIND_UNORDERED_ACCESS | D3D11_BIND_SHADER_RESOURCE;
 		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_outputTexture.put()));
 
+		desc.Usage = D3D11_USAGE_DEFAULT;
+		desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		desc.MiscFlags = 0;
+		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_outputSnapshotTexture.put()));
+
 		desc.Usage = D3D11_USAGE_STAGING;
 		desc.BindFlags = 0;
 		desc.MiscFlags = 0;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_stagingTexture.put()));
 
 	}
@@ -140,32 +145,39 @@ TransparencyFixer::TransparencyFixer(
 
 }
 
-void TransparencyFixer::InitPrevious(winrt::com_ptr<ID3D11Texture2D> const& texture, std::vector<uint8_t> const& indexPixels)
+void TransparencyFixer::InitPrevious(
+	winrt::com_ptr<ID3D11Texture2D> const& texture, 
+	winrt::com_ptr<ID3D11Texture2D> const& indexedTexture,
+	std::vector<uint8_t>& indexPixels)
 {
 	m_d3dContext->CopyResource(m_previousTexture.get(), texture.get());
+	m_d3dContext->CopyResource(m_previousIndexTexture.get(), indexedTexture.get());
 	D3D11_TEXTURE2D_DESC desc = {};
-	m_previousIndexTexture->GetDesc(&desc);
-	WINRT_VERIFY(indexPixels.size() == desc.Width * desc.Height);
-
+	indexedTexture->GetDesc(&desc);
+	m_d3dContext->CopyResource(m_stagingTexture.get(), indexedTexture.get());
 	{
 		D3D11_MAPPED_SUBRESOURCE mapped = {};
-		winrt::check_hresult(m_d3dContext->Map(m_previousIndexStagingTexture.get(), 0, D3D11_MAP_WRITE, 0, &mapped));
+		winrt::check_hresult(m_d3dContext->Map(m_stagingTexture.get(), 0, D3D11_MAP_READ, 0, &mapped));
+
 		auto stride = desc.Width;
-		auto dest = reinterpret_cast<byte*>(mapped.pData);
-		auto source = indexPixels.data();
+		auto source = reinterpret_cast<byte*>(mapped.pData);
+		auto dest = indexPixels.data();
 		for (auto i = 0; i < (int)desc.Height; i++)
 		{
 			memcpy(dest, source, stride);
 
-			dest += mapped.RowPitch;
-			source += stride;
+			source += mapped.RowPitch;
+			dest += stride;
 		}
-		m_d3dContext->Unmap(m_previousIndexStagingTexture.get(), 0);
+		m_d3dContext->Unmap(m_stagingTexture.get(), 0);
 	}
-	m_d3dContext->CopyResource(m_previousIndexTexture.get(), m_previousIndexStagingTexture.get());
 }
 
-DiffInfo TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& texture, int transparentColorIndex, std::vector<uint8_t>& indexPixels)
+DiffInfo TransparencyFixer::ProcessInput(
+	winrt::com_ptr<ID3D11Texture2D> const& texture, 
+	winrt::com_ptr<ID3D11Texture2D> const& indexedTexture,
+	int transparentColorIndex, 
+	std::vector<uint8_t>& indexPixels)
 {
 	D3D11_TEXTURE2D_DESC desc = {};
 	texture->GetDesc(&desc);
@@ -188,22 +200,8 @@ DiffInfo TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& 
 	m_d3dContext->CopyResource(m_diffInfoBuffer.get(), m_diffInfoDefaultBuffer.get());
 
 	// Update our output texture
-	{
-		D3D11_MAPPED_SUBRESOURCE mapped = {};
-		winrt::check_hresult(m_d3dContext->Map(m_stagingTexture.get(), 0, D3D11_MAP_WRITE, 0, &mapped));
-		auto stride = desc.Width;
-		auto dest = reinterpret_cast<byte*>(mapped.pData);
-		auto source = indexPixels.data();
-		for (auto i = 0; i < (int)desc.Height; i++)
-		{
-			memcpy(dest, source, stride);
-
-			dest += mapped.RowPitch;
-			source += stride;
-		}
-		m_d3dContext->Unmap(m_stagingTexture.get(), 0);
-	}
-	m_d3dContext->CopyResource(m_outputTexture.get(), m_stagingTexture.get());
+	m_d3dContext->CopyResource(m_outputTexture.get(), indexedTexture.get());
+	m_d3dContext->CopyResource(m_outputSnapshotTexture.get(), m_outputTexture.get());
 
 	// Update our current texture
 	m_d3dContext->CopyResource(m_currentTexture.get(), texture.get());
@@ -245,7 +243,7 @@ DiffInfo TransparencyFixer::ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& 
 
 	// Copy current to previous
 	m_d3dContext->CopyResource(m_previousTexture.get(), m_currentTexture.get());
-	m_d3dContext->CopyResource(m_previousIndexTexture.get(), m_outputTexture.get());
+	m_d3dContext->CopyResource(m_previousIndexTexture.get(), m_outputSnapshotTexture.get());
 
 	// Unbind pipeline
 	m_d3dContext->CSSetShader(nullptr, nullptr, 0);

@@ -18,14 +18,22 @@ public:
 		uint32_t width,
 		uint32_t height);
 
-	void InitPrevious(winrt::com_ptr<ID3D11Texture2D> const& texture, std::vector<uint8_t> const& indexPixels);
-	DiffInfo ProcessInput(winrt::com_ptr<ID3D11Texture2D> const& inputTexture, int transparentColorIndex, std::vector<uint8_t>& indexPixels);
+	void InitPrevious(
+		winrt::com_ptr<ID3D11Texture2D> const& texture, 
+		winrt::com_ptr<ID3D11Texture2D> const& indexedTexture,
+		std::vector<uint8_t>& indexPixels);
+	DiffInfo ProcessInput(
+		winrt::com_ptr<ID3D11Texture2D> const& inputTexture, 
+		winrt::com_ptr<ID3D11Texture2D> const& indexedTexture, 
+		int transparentColorIndex, 
+		std::vector<uint8_t>& indexPixels);
 
 private:
 	winrt::com_ptr<ID3D11DeviceContext> m_d3dContext;
 	winrt::com_ptr<ID3D11Texture2D> m_currentTexture;
 	winrt::com_ptr<ID3D11ShaderResourceView> m_currentSrv;
 	winrt::com_ptr<ID3D11Texture2D> m_outputTexture;
+	winrt::com_ptr<ID3D11Texture2D> m_outputSnapshotTexture;
 	winrt::com_ptr<ID3D11UnorderedAccessView> m_outputUav;
 	winrt::com_ptr<ID3D11Buffer> m_frameInfoBuffer;
 	winrt::com_ptr<ID3D11Buffer> m_frameInfoStagingBuffer;

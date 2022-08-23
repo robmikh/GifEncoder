@@ -39,7 +39,11 @@ void main( uint3 DTid : SV_DispatchThreadID )
             (currentPixel.z == previousPixel.z) &&
             (currentPixel.w == previousPixel.w);
 
-        if (!samePixel && !sameIndex)
+        if (sameIndex || samePixel)
+        {
+            index = TransparentColorIndex;
+        }
+        else
         {
             uint value = 0;
             InterlockedAdd(diffBuffer[0].NumDifferingPixels, 1, value);
@@ -49,10 +53,6 @@ void main( uint3 DTid : SV_DispatchThreadID )
             InterlockedMin(diffBuffer[0].top, position.y, value);
             InterlockedMax(diffBuffer[0].right, position.x, value);
             InterlockedMax(diffBuffer[0].bottom, position.y, value);
-        }
-        else
-        {
-            index = TransparentColorIndex;
         }
 
         if (currentPixel.w <= 0.1f)

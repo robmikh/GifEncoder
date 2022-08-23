@@ -69,12 +69,6 @@ ColorQuantizer::ColorQuantizer(
 		desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_outputTexture.put()));
 
-		desc.Usage = D3D11_USAGE_STAGING;
-		desc.BindFlags = 0;
-		desc.MiscFlags = 0;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
-		winrt::check_hresult(d3dDevice->CreateTexture2D(&desc, nullptr, m_stagingTexture.put()));
-
 	}
 	winrt::check_hresult(d3dDevice->CreateRenderTargetView(m_outputTexture.get(), nullptr, m_outputRtv.put()));
 
@@ -105,7 +99,7 @@ ColorQuantizer::ColorQuantizer(
 	winrt::com_ptr<ID3D11InputLayout> inputLayout;
 	winrt::check_hresult(d3dDevice->CreateInputLayout(
 		vertexDesc.data(),
-		vertexDesc.size(),
+		static_cast<uint32_t>(vertexDesc.size()),
 		shaders::vertex::g_main,
 		ARRAYSIZE(shaders::vertex::g_main),
 		inputLayout.put()));
@@ -114,7 +108,7 @@ ColorQuantizer::ColorQuantizer(
 	std::vector<ID3D11Buffer*> vertexBuffers = { m_vertexBuffer.get() };
 	uint32_t vertexStride = sizeof(Vertex);
 	uint32_t offset = 0;
-	m_d3dContext->IASetVertexBuffers(0, vertexBuffers.size(), vertexBuffers.data(), &vertexStride, &offset);
+	m_d3dContext->IASetVertexBuffers(0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), &vertexStride, &offset);
 	m_d3dContext->IASetIndexBuffer(m_indexBuffer.get(), DXGI_FORMAT_R16_UINT, 0);
 	m_d3dContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_d3dContext->IASetInputLayout(inputLayout.get());
@@ -123,8 +117,7 @@ ColorQuantizer::ColorQuantizer(
 
 void ColorQuantizer::Quantize(
 	winrt::com_ptr<ID3D11Texture2D> const& texture,
-	winrt::com_ptr<ID3D11ShaderResourceView> const& lutSrv,
-	std::vector<uint8_t>& bytes)
+	winrt::com_ptr<ID3D11ShaderResourceView> const& lutSrv)
 {
 	D3D11_TEXTURE2D_DESC desc = {};
 	texture->GetDesc(&desc);
@@ -134,13 +127,13 @@ void ColorQuantizer::Quantize(
 	m_d3dContext->VSSetShader(m_vertexShader.get(), nullptr, 0);
 	m_d3dContext->PSSetShader(m_pixelShader.get(), nullptr, 0);
 	std::vector<ID3D11Buffer*> constantBuffers = { nullptr };
-	m_d3dContext->VSSetConstantBuffers(0, constantBuffers.size(), constantBuffers.data());
+	m_d3dContext->VSSetConstantBuffers(0, static_cast<uint32_t>(constantBuffers.size()), constantBuffers.data());
 	std::vector<ID3D11ShaderResourceView*> srvs = { m_inputSrv.get(), lutSrv.get() };
-	m_d3dContext->PSSetShaderResources(0, srvs.size(), srvs.data());
+	m_d3dContext->PSSetShaderResources(0, static_cast<uint32_t>(srvs.size()), srvs.data());
 	std::vector<ID3D11SamplerState*> samplers = { m_inputSampler.get() };
-	m_d3dContext->PSSetSamplers(0, samplers.size(), samplers.data());
+	m_d3dContext->PSSetSamplers(0, static_cast<uint32_t>(samplers.size()), samplers.data());
 	std::vector<ID3D11RenderTargetView*> rtvs = { m_outputRtv.get() };
-	m_d3dContext->OMSetRenderTargets(rtvs.size(), rtvs.data(), nullptr);
+	m_d3dContext->OMSetRenderTargets(static_cast<uint32_t>(rtvs.size()), rtvs.data(), nullptr);
 
 	D3D11_VIEWPORT viewport = {};
 	viewport.TopLeftX = 0.0f;
@@ -153,29 +146,10 @@ void ColorQuantizer::Quantize(
 
 	m_d3dContext->DrawIndexed(6, 0, 0);
 
-	m_d3dContext->CopyResource(m_stagingTexture.get(), m_outputTexture.get());
-	{
-		D3D11_MAPPED_SUBRESOURCE mapped = {};
-		winrt::check_hresult(m_d3dContext->Map(m_stagingTexture.get(), 0, D3D11_MAP_READ, 0, &mapped));
-
-		auto stride = desc.Width;
-		WINRT_VERIFY(bytes.size() == stride * desc.Height);
-		auto source = reinterpret_cast<byte*>(mapped.pData);
-		auto dest = bytes.data();
-		for (auto i = 0; i < (int)desc.Height; i++)
-		{
-			memcpy(dest, source, stride);
-
-			source += mapped.RowPitch;
-			dest += stride;
-		}
-		m_d3dContext->Unmap(m_stagingTexture.get(), 0);
-	}
-
 	srvs = { nullptr, nullptr };
-	m_d3dContext->PSSetShaderResources(0, srvs.size(), srvs.data());
+	m_d3dContext->PSSetShaderResources(0, static_cast<uint32_t>(srvs.size()), srvs.data());
 	rtvs = { nullptr };
-	m_d3dContext->OMSetRenderTargets(rtvs.size(), rtvs.data(), nullptr);
+	m_d3dContext->OMSetRenderTargets(static_cast<uint32_t>(rtvs.size()), rtvs.data(), nullptr);
 }
 
 template<typename T>
@@ -184,7 +158,7 @@ winrt::com_ptr<ID3D11Buffer> CreateBuffer(winrt::com_ptr<ID3D11Device> d3dDevice
 	D3D11_SUBRESOURCE_DATA bufferData = {};
 	bufferData.pSysMem = reinterpret_cast<const void*>(data.data());
 	D3D11_BUFFER_DESC desc = {};
-	desc.ByteWidth = sizeof(T) * data.size();
+	desc.ByteWidth = static_cast<uint32_t>(sizeof(T) * data.size());
 	desc.Usage = D3D11_USAGE_DEFAULT;
 	desc.BindFlags = bindFlags;
 	winrt::com_ptr<ID3D11Buffer> buffer;

@@ -11,8 +11,9 @@ public:
 
 	void Quantize(
 		winrt::com_ptr<ID3D11Texture2D> const& texture,
-		winrt::com_ptr<ID3D11ShaderResourceView> const& lutSrv,
-		std::vector<uint8_t>& bytes);
+		winrt::com_ptr<ID3D11ShaderResourceView> const& lutSrv);
+
+	winrt::com_ptr<ID3D11Texture2D> const& OutputTexture() { return m_outputTexture; }
 
 private:
 	winrt::com_ptr<ID3D11Texture2D> m_inputTexture;
@@ -22,7 +23,6 @@ private:
 	winrt::com_ptr<ID3D11RenderTargetView> m_outputRtv;
 	winrt::com_ptr<ID3D11Buffer> m_vertexBuffer;
 	winrt::com_ptr<ID3D11Buffer> m_indexBuffer;
-	winrt::com_ptr<ID3D11Texture2D> m_stagingTexture;
 	winrt::com_ptr<ID3D11DeviceContext> m_d3dContext;
 	winrt::com_ptr<ID3D11VertexShader> m_vertexShader;
 	winrt::com_ptr<ID3D11PixelShader> m_pixelShader;
